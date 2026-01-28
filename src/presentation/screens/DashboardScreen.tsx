@@ -11,6 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../theme';
 import { PerformanceCard, Button, BottomSheet, Input, Select } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
@@ -26,6 +27,8 @@ const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
 export const DashboardScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showAddRecord, setShowAddRecord] = useState(false);
+  const [showEditRecord, setShowEditRecord] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<any>(null);
   
   const [selectedWorker, setSelectedWorker] = useState('');
   const [selectedActivity, setSelectedActivity] = useState('');
@@ -45,6 +48,7 @@ export const DashboardScreen: React.FC = () => {
     fetchRecordsByDate,
     fetchStatsByDate,
     addRecord,
+    updateRecord,
     deleteRecord,
     isLoading 
   } = usePerformanceStore();
@@ -144,6 +148,42 @@ export const DashboardScreen: React.FC = () => {
     setSelectedActivity('');
     setAchievedPerformance('');
     setNotes('');
+    setEditingRecord(null);
+  };
+
+  const handleEditRecord = (record: any) => {
+    setEditingRecord(record);
+    setSelectedWorker(record.workerId);
+    setSelectedActivity(record.activityId);
+    setAchievedPerformance(record.achievedPerformance.toString());
+    setNotes(record.notes || '');
+    setShowEditRecord(true);
+  };
+
+  const handleUpdateRecord = async () => {
+    if (!editingRecord || !achievedPerformance) {
+      showToast('El rendimiento es requerido', 'warning');
+      return;
+    }
+
+    const activity = activities.find(a => a.id === selectedActivity);
+    if (!activity) return;
+
+    try {
+      await updateRecord(editingRecord.id, {
+        achievedPerformance: parseFloat(achievedPerformance),
+        expectedPerformance: activity.expectedPerformance,
+        notes: notes || undefined,
+      });
+      
+      resetForm();
+      setShowEditRecord(false);
+      await fetchRecordsByDate(selectedDate);
+      await fetchStatsByDate(selectedDate);
+      showToast('Registro actualizado correctamente', 'success');
+    } catch (error) {
+      showToast('No se pudo actualizar el registro', 'error');
+    }
   };
 
   const handleDeleteRecord = (id: string) => {
@@ -181,7 +221,7 @@ export const DashboardScreen: React.FC = () => {
                 style={styles.dateArrow}
                 activeOpacity={0.7}
               >
-                <Text style={styles.dateArrowText}>‹</Text>
+                <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity 
                 onPress={goToToday} 
@@ -199,7 +239,7 @@ export const DashboardScreen: React.FC = () => {
                 disabled={isToday}
                 activeOpacity={0.7}
               >
-                <Text style={[styles.dateArrowText, isToday && styles.dateArrowTextDisabled]}>›</Text>
+                <MaterialIcons name="chevron-right" size={28} color={isToday ? colors.textLight : colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -297,6 +337,7 @@ export const DashboardScreen: React.FC = () => {
               <PerformanceCard
                 key={record.id}
                 record={record}
+                onPress={() => handleEditRecord(record)}
                 onDelete={() => handleDeleteRecord(record.id)}
               />
             ))
@@ -365,6 +406,49 @@ export const DashboardScreen: React.FC = () => {
         />
       </BottomSheet>
 
+      <BottomSheet visible={showEditRecord} onClose={() => { resetForm(); setShowEditRecord(false); }}>
+        <Text style={styles.sheetTitle}>Editar Registro</Text>
+        
+        <View style={styles.editInfo}>
+          <Text style={styles.editInfoLabel}>Trabajador</Text>
+          <Text style={styles.editInfoValue}>{editingRecord?.workerName}</Text>
+        </View>
+
+        <View style={styles.editInfo}>
+          <Text style={styles.editInfoLabel}>Actividad</Text>
+          <Text style={styles.editInfoValue}>{editingRecord?.activityName}</Text>
+        </View>
+
+        <View style={styles.metaInfo}>
+          <Text style={styles.metaText}>
+            Meta: {editingRecord?.expectedPerformance} {editingRecord?.activityUnit}
+          </Text>
+        </View>
+
+        <Input
+          label="Rendimiento Logrado"
+          placeholder="Ej: 150"
+          keyboardType="numeric"
+          value={achievedPerformance}
+          onChangeText={setAchievedPerformance}
+        />
+
+        <Input
+          label="Notas (opcional)"
+          placeholder="Agregar notas..."
+          multiline={true}
+          numberOfLines={3}
+          value={notes}
+          onChangeText={setNotes}
+        />
+
+        <Button
+          title="Actualizar Registro"
+          onPress={handleUpdateRecord}
+          loading={isLoading}
+        />
+      </BottomSheet>
+
     </SafeAreaView>
   );
 };
@@ -403,10 +487,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dateArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.background,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: colors.gray[100],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -417,6 +501,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '600',
     color: colors.primary,
+    textAlign: 'center',
+    lineHeight: 24,
   },
   dateArrowTextDisabled: {
     color: colors.textLight,
@@ -645,6 +731,19 @@ const styles = StyleSheet.create({
   metaText: {
     color: colors.primary,
     fontWeight: '500',
+  },
+  editInfo: {
+    marginBottom: 12,
+  },
+  editInfoLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  editInfoValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
   },
   exportOption: {
     flexDirection: 'row',

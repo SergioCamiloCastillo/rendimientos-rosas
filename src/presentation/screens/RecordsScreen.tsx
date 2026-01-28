@@ -9,6 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../theme';
 import { PerformanceCard, BottomSheet, Select, Button, EmptyState } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
@@ -134,13 +135,13 @@ export const RecordsScreen: React.FC = () => {
             style={[styles.headerButton, hasActiveFilters && styles.headerButtonActive]}
             onPress={() => setShowFilters(true)}
           >
-            <Text style={styles.headerIcon}>🔍</Text>
+            <MaterialIcons name="filter-list" size={24} color={hasActiveFilters ? colors.primary : colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerButton}
             onPress={() => setShowExportOptions(true)}
           >
-            <Text style={styles.headerIcon}>📊</Text>
+            <MaterialIcons name="file-download" size={24} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>

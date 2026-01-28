@@ -67,14 +67,14 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   fetchRecordsByDate: async (date: Date) => {
     try {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
       
       const selectedDateRecords = await PerformanceRepository.getWithDetails({
-        startDate: startOfDay.toISOString(),
-        endDate: endOfDay.toISOString(),
+        startDate: dateString,
+        endDate: dateString,
       });
       set({ selectedDateRecords });
     } catch (error) {
@@ -100,14 +100,14 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   fetchStatsByDate: async (date: Date) => {
     try {
-      const startOfDay = new Date(date);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(date);
-      endOfDay.setHours(23, 59, 59, 999);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
       
       const stats = await PerformanceRepository.getStats({
-        startDate: startOfDay.toISOString(),
-        endDate: endOfDay.toISOString(),
+        startDate: dateString,
+        endDate: dateString,
       });
       set({ stats });
     } catch (error) {

@@ -22,14 +22,14 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
 
   return (
     <TouchableOpacity
-      style={styles.card}
+      style={[styles.card, !record.metGoal && styles.cardNotMet]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={styles.header}>
         <View style={styles.dateContainer}>
           <Text style={styles.date}>
-            {format(new Date(record.date), 'dd MMM', { locale: es })}
+            {format(new Date(record.date + 'T12:00:00'), 'dd MMM', { locale: es })}
           </Text>
         </View>
         <View
@@ -108,6 +108,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+  },
+  cardNotMet: {
+    backgroundColor: colors.dangerLight,
   },
   header: {
     flexDirection: 'row',
