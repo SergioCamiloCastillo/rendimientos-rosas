@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../theme';
-import { PerformanceCard, Button, BottomSheet, Input, Select } from '../components';
+import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -33,6 +33,8 @@ export const DashboardScreen: React.FC = () => {
   const [selectedWorker, setSelectedWorker] = useState('');
   const [selectedActivity, setSelectedActivity] = useState('');
   const [achievedPerformance, setAchievedPerformance] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [notes, setNotes] = useState('');
 
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -114,14 +116,74 @@ export const DashboardScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  const calculateHours = (start: string, end: string): number => {
+    const [startH, startM] = start.split(':').map(Number);
+    const [endH, endM] = end.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    return Math.max(0, (endMinutes - startMinutes) / 60);
+  };
+
+  const timeToMinutes = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const checkTimeOverlap = (newStart: string, newEnd: string, existingShifts: any[]): boolean => {
+    const newStartMin = timeToMinutes(newStart);
+    const newEndMin = timeToMinutes(newEnd);
+
+    for (const shift of existingShifts) {
+      const existingStartMin = timeToMinutes(shift.startTime);
+      const existingEndMin = timeToMinutes(shift.endTime);
+
+      // Verificar si hay solapamiento
+      if (
+        (newStartMin >= existingStartMin && newStartMin < existingEndMin) ||
+        (newEndMin > existingStartMin && newEndMin <= existingEndMin) ||
+        (newStartMin <= existingStartMin && newEndMin >= existingEndMin)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const handleAddRecord = async () => {
-    if (!selectedWorker || !selectedActivity || !achievedPerformance) {
-      Alert.alert('Error', 'Por favor completa todos los campos requeridos');
+    if (!selectedWorker || !selectedActivity || !achievedPerformance || !startTime || !endTime) {
+      showToast('Por favor completa todos los campos requeridos', 'error');
       return;
     }
 
     const activity = activities.find(a => a.id === selectedActivity);
     if (!activity) return;
+
+    const hours = calculateHours(startTime, endTime);
+    if (hours <= 0) {
+      showToast('La hora de fin debe ser mayor a la hora de inicio', 'error');
+      return;
+    }
+
+    // Verificar si ya existe un registro para este trabajador y actividad en la fecha
+    const existingRecord = selectedDateRecords.find(
+      r => r.workerId === selectedWorker && 
+           r.activityId === selectedActivity &&
+           !r.isDeleted
+    );
+
+    // Si existe, verificar solapamiento de horarios
+    if (existingRecord && existingRecord.shifts && existingRecord.shifts.length > 0) {
+      if (checkTimeOverlap(startTime, endTime, existingRecord.shifts)) {
+        showToast('Este horario se solapa con un turno ya registrado', 'error');
+        return;
+      }
+    }
+
+    const shift = {
+      startTime,
+      endTime,
+      achievedPerformance: parseFloat(achievedPerformance),
+    };
 
     try {
       await addRecord({
@@ -130,6 +192,8 @@ export const DashboardScreen: React.FC = () => {
         date: format(selectedDate, 'yyyy-MM-dd'),
         achievedPerformance: parseFloat(achievedPerformance),
         expectedPerformance: activity.expectedPerformance,
+        shifts: [shift],
+        totalHours: hours,
         notes: notes || undefined,
       });
       
@@ -147,6 +211,8 @@ export const DashboardScreen: React.FC = () => {
     setSelectedWorker('');
     setSelectedActivity('');
     setAchievedPerformance('');
+    setStartTime('');
+    setEndTime('');
     setNotes('');
     setEditingRecord(null);
   };
@@ -377,7 +443,34 @@ export const DashboardScreen: React.FC = () => {
         {selectedActivityData && (
           <View style={styles.metaInfo}>
             <Text style={styles.metaText}>
-              Meta: {selectedActivityData.expectedPerformance} {selectedActivityData.unit}
+              Meta: {selectedActivityData.expectedPerformance} {selectedActivityData.unit}/hora
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.timeRow}>
+          <View style={styles.timeInput}>
+            <TimePicker
+              label="Hora Inicio"
+              placeholder="08:00"
+              value={startTime}
+              onChange={setStartTime}
+            />
+          </View>
+          <View style={styles.timeInput}>
+            <TimePicker
+              label="Hora Fin"
+              placeholder="17:00"
+              value={endTime}
+              onChange={setEndTime}
+            />
+          </View>
+        </View>
+
+        {startTime && endTime && calculateHours(startTime, endTime) > 0 && (
+          <View style={styles.hoursInfo}>
+            <Text style={styles.hoursText}>
+              Horas trabajadas: {calculateHours(startTime, endTime).toFixed(1)}h
             </Text>
           </View>
         )}
@@ -476,7 +569,7 @@ const styles = StyleSheet.create({
   },
   expandedHeader: {
     padding: 20,
-    paddingTop: 30,
+    paddingTop: 45,
   },
   headerTop: {
     marginBottom: 12,
@@ -769,5 +862,23 @@ const styles = StyleSheet.create({
   exportOptionSubtitle: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  timeInput: {
+    flex: 1,
+  },
+  hoursInfo: {
+    backgroundColor: colors.primaryLight,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  hoursText: {
+    color: colors.primary,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

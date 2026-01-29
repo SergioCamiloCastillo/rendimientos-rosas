@@ -16,9 +16,24 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
   onPress,
   onDelete,
 }) => {
-  const percentage = Math.round(
-    (record.achievedPerformance / record.expectedPerformance) * 100
-  );
+  // Calcular meta total basada en horas trabajadas
+  const totalHours = record.totalHours || 0;
+  const hasHours = totalHours > 0;
+  
+  // Para registros con horas: meta = expectedPerformance * totalHours
+  // Para registros antiguos sin horas: usar expectedPerformance directamente
+  const expectedTotal = hasHours 
+    ? record.expectedPerformance * totalHours 
+    : record.expectedPerformance;
+  
+  const percentage = expectedTotal > 0 
+    ? Math.round((record.achievedPerformance / expectedTotal) * 100)
+    : 0;
+
+  // Formatear turnos para mostrar
+  const shiftsText = record.shifts && record.shifts.length > 0
+    ? record.shifts.map(s => `${s.startTime}-${s.endTime}`).join(', ')
+    : '';
 
   return (
     <TouchableOpacity
@@ -52,6 +67,11 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
       <View style={styles.content}>
         <Text style={styles.workerName}>{record.workerName}</Text>
         <Text style={styles.activityName}>{record.activityName}</Text>
+        {totalHours > 0 && (
+          <Text style={styles.hoursText}>
+            {totalHours.toFixed(1)}h trabajadas {shiftsText && `(${shiftsText})`}
+          </Text>
+        )}
       </View>
 
       <View style={styles.performanceContainer}>
@@ -63,9 +83,11 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
         </View>
         <View style={styles.divider} />
         <View style={styles.performanceItem}>
-          <Text style={styles.performanceLabel}>Meta</Text>
+          <Text style={styles.performanceLabel}>
+            {hasHours ? `Meta (${totalHours.toFixed(1)}h)` : 'Meta'}
+          </Text>
           <Text style={styles.performanceValue}>
-            {record.expectedPerformance} {record.activityUnit}
+            {hasHours ? expectedTotal.toFixed(0) : record.expectedPerformance} {record.activityUnit}
           </Text>
         </View>
         <View style={styles.divider} />
@@ -163,6 +185,12 @@ const styles = StyleSheet.create({
   activityName: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  hoursText: {
+    fontSize: 12,
+    color: colors.primary,
+    marginTop: 4,
+    fontWeight: '500',
   },
   performanceContainer: {
     flexDirection: 'row',

@@ -2,7 +2,8 @@ import {
   PerformanceRecord, 
   CreatePerformanceRecordInput, 
   PerformanceRecordSchema,
-  PerformanceRecordWithDetails 
+  PerformanceRecordWithDetails,
+  WorkShift
 } from '../../domain/entities';
 import { AsyncStorageAdapter, STORAGE_KEYS } from '../../infrastructure/storage/AsyncStorageAdapter';
 import { WorkerRepository } from './WorkerRepository';
@@ -37,11 +38,52 @@ export class PerformanceRepository {
     const records = await this.getAll();
     const now = new Date().toISOString();
     
-    const metGoal = input.achievedPerformance >= input.expectedPerformance;
+    // Buscar si ya existe un registro para el mismo trabajador, actividad y fecha
+    const existingIndex = records.findIndex(
+      r => r.workerId === input.workerId && 
+           r.activityId === input.activityId && 
+           r.date === input.date &&
+           !r.isDeleted
+    );
+
+    if (existingIndex !== -1) {
+      // Agregar el turno al registro existente
+      const existing = records[existingIndex];
+      const newShifts: WorkShift[] = [...(existing.shifts || []), ...(input.shifts || [])];
+      const totalAchieved = newShifts.reduce((sum, s) => sum + s.achievedPerformance, 0);
+      const totalHours = (existing.totalHours || 0) + (input.totalHours || 0);
+      
+      // Calcular si cumplió la meta basado en rendimiento por hora
+      // Meta = expectedPerformance * totalHours
+      const expectedTotal = input.expectedPerformance * totalHours;
+      const metGoal = totalAchieved >= expectedTotal;
+
+      const updated: PerformanceRecord = {
+        ...existing,
+        shifts: newShifts,
+        achievedPerformance: totalAchieved,
+        totalHours,
+        metGoal,
+        updatedAt: now,
+      };
+
+      const validated = PerformanceRecordSchema.parse(updated);
+      records[existingIndex] = validated;
+      await AsyncStorageAdapter.setItem(STORAGE_KEYS.PERFORMANCE_RECORDS, records);
+      
+      return validated;
+    }
+
+    // Crear nuevo registro
+    const totalHours = input.totalHours || 0;
+    const expectedTotal = input.expectedPerformance * totalHours;
+    const metGoal = input.achievedPerformance >= expectedTotal;
     
     const newRecord: PerformanceRecord = {
       ...input,
       id: uuid.v4() as string,
+      shifts: input.shifts || [],
+      totalHours: input.totalHours || 0,
       metGoal,
       isDeleted: false,
       createdAt: now,

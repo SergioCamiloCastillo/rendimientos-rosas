@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as XLSX from 'xlsx';
 import { PerformanceRecordWithDetails } from '../domain/entities';
@@ -20,7 +20,7 @@ export async function exportToExcel(
   } = options;
 
   const data = records.map(record => ({
-    'Fecha': format(new Date(record.date), 'dd/MM/yyyy', { locale: es }),
+    'Fecha': format(new Date(record.date + 'T12:00:00'), 'dd/MM/yyyy', { locale: es }),
     'Trabajador': record.workerName,
     'Actividad': record.activityName,
     'Rendimiento Logrado': record.achievedPerformance,
@@ -39,13 +39,13 @@ export async function exportToExcel(
   const uri = (FileSystem.documentDirectory || '') + `${filename}.xlsx`;
 
   await FileSystem.writeAsStringAsync(uri, wbout, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: 'base64',
   });
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: 'Exportar Rendimientos',
+      dialogTitle: 'Guardar o Compartir Rendimientos',
       UTI: 'com.microsoft.excel.xlsx',
     });
   }
@@ -67,7 +67,7 @@ export async function exportByActivity(
 
   Object.entries(groupedByActivity).forEach(([activityName, activityRecords]) => {
     const data = activityRecords.map(record => ({
-      'Fecha': format(new Date(record.date), 'dd/MM/yyyy', { locale: es }),
+      'Fecha': format(new Date(record.date + 'T12:00:00'), 'dd/MM/yyyy', { locale: es }),
       'Trabajador': record.workerName,
       'Rendimiento Logrado': record.achievedPerformance,
       'Meta': record.expectedPerformance,
@@ -87,13 +87,13 @@ export async function exportByActivity(
   const uri = (FileSystem.documentDirectory || '') + `${filename}.xlsx`;
 
   await FileSystem.writeAsStringAsync(uri, wbout, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: 'base64',
   });
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: 'Exportar Rendimientos por Actividad',
+      dialogTitle: 'Guardar o Compartir por Actividad',
       UTI: 'com.microsoft.excel.xlsx',
     });
   }
@@ -115,7 +115,7 @@ export async function exportByWorker(
 
   Object.entries(groupedByWorker).forEach(([workerName, workerRecords]) => {
     const data = workerRecords.map(record => ({
-      'Fecha': format(new Date(record.date), 'dd/MM/yyyy', { locale: es }),
+      'Fecha': format(new Date(record.date + 'T12:00:00'), 'dd/MM/yyyy', { locale: es }),
       'Actividad': record.activityName,
       'Rendimiento Logrado': record.achievedPerformance,
       'Meta': record.expectedPerformance,
@@ -135,13 +135,13 @@ export async function exportByWorker(
   const uri = (FileSystem.documentDirectory || '') + `${filename}.xlsx`;
 
   await FileSystem.writeAsStringAsync(uri, wbout, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: 'base64',
   });
 
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: 'Exportar Rendimientos por Trabajador',
+      dialogTitle: 'Guardar o Compartir por Trabajador',
       UTI: 'com.microsoft.excel.xlsx',
     });
   }

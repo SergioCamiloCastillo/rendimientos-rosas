@@ -8,3 +8,4 @@ export * from './Select';
 export * from './ListItem';
 export * from './EmptyState';
 export * from './Toast';
+export * from './TimePicker';
