@@ -24,6 +24,49 @@ export class PerformanceRepository {
     return records || [];
   }
 
+  static async recalculateAllMetGoals(): Promise<void> {
+    const records = await this.getAll();
+    let updated = false;
+
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+      
+      // Calcular totalHours desde los turnos si no existe o es 0
+      let totalHours = record.totalHours || 0;
+      if (totalHours === 0 && record.shifts && record.shifts.length > 0) {
+        totalHours = record.shifts.reduce((sum, shift) => {
+          const [startH, startM] = shift.startTime.split(':').map(Number);
+          const [endH, endM] = shift.endTime.split(':').map(Number);
+          const startMinutes = startH * 60 + startM;
+          const endMinutes = endH * 60 + endM;
+          return sum + (endMinutes - startMinutes) / 60;
+        }, 0);
+      }
+      
+      // Calcular metGoal correctamente basado en horas
+      const expectedTotal = totalHours > 0 
+        ? record.expectedPerformance * totalHours 
+        : record.expectedPerformance;
+      
+      const correctMetGoal = record.achievedPerformance >= expectedTotal;
+      
+      // Actualizar si metGoal es diferente o totalHours cambió
+      if (record.metGoal !== correctMetGoal || record.totalHours !== totalHours) {
+        records[i] = {
+          ...record,
+          totalHours,
+          metGoal: correctMetGoal,
+          updatedAt: new Date().toISOString(),
+        };
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      await AsyncStorageAdapter.setItem(STORAGE_KEYS.PERFORMANCE_RECORDS, records);
+    }
+  }
+
   static async getActive(): Promise<PerformanceRecord[]> {
     const records = await this.getAll();
     return records.filter(r => !r.isDeleted);
@@ -105,7 +148,13 @@ export class PerformanceRepository {
 
     const achievedPerformance = input.achievedPerformance ?? records[index].achievedPerformance;
     const expectedPerformance = input.expectedPerformance ?? records[index].expectedPerformance;
-    const metGoal = achievedPerformance >= expectedPerformance;
+    const totalHours = input.totalHours ?? records[index].totalHours ?? 0;
+    
+    // Calcular metGoal basado en horas trabajadas
+    // Si tiene horas: meta = expectedPerformance * totalHours
+    // Si no tiene horas (registros antiguos): meta = expectedPerformance
+    const expectedTotal = totalHours > 0 ? expectedPerformance * totalHours : expectedPerformance;
+    const metGoal = achievedPerformance >= expectedTotal;
 
     const updated: PerformanceRecord = {
       ...records[index],
@@ -182,6 +231,7 @@ export class PerformanceRepository {
       return {
         ...record,
         workerName: worker?.name || 'Trabajador eliminado',
+        workerCode: worker?.code || '',
         activityName: activity?.name || 'Actividad eliminada',
         activityUnit: activity?.unit || '',
       };
@@ -206,10 +256,30 @@ export class PerformanceRepository {
   }> {
     const records = filters ? await this.getFiltered(filters) : await this.getActive();
     const total = records.length;
-    const metGoal = records.filter(r => r.metGoal).length;
-    const notMetGoal = total - metGoal;
-    const percentage = total > 0 ? Math.round((metGoal / total) * 100) : 0;
+    
+    // Calcular metGoal y porcentaje promedio
+    let totalPercentage = 0;
+    let metGoalCount = 0;
+    
+    for (const r of records) {
+      const totalHoursRaw = r.totalHours || 0;
+      const totalHours = Math.round(totalHoursRaw * 10) / 10;
+      const expectedTotal = totalHours > 0 
+        ? Math.round(r.expectedPerformance * totalHours)
+        : r.expectedPerformance;
+      const recordPercentage = expectedTotal > 0 
+        ? (r.achievedPerformance / expectedTotal) * 100 
+        : 0;
+      
+      totalPercentage += recordPercentage;
+      if (recordPercentage >= 100) {
+        metGoalCount++;
+      }
+    }
+    
+    const notMetGoal = total - metGoalCount;
+    const percentage = total > 0 ? Math.round(totalPercentage / total) : 0;
 
-    return { total, metGoal, notMetGoal, percentage };
+    return { total, metGoal: metGoalCount, notMetGoal, percentage };
   }
 }

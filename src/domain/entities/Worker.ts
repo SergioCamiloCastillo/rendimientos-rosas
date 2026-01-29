@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const WorkerSchema = z.object({
   id: z.string().uuid(),
+  code: z.string().default(''),
   name: z.string().min(1, 'El nombre es requerido'),
   identification: z.string().optional().default(''),
   position: z.string().optional(),

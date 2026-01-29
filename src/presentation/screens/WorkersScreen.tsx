@@ -22,6 +22,7 @@ export const WorkersScreen: React.FC = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
   
+  const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [position, setPosition] = useState('');
   const { showToast } = useToast();
@@ -51,19 +52,21 @@ export const WorkersScreen: React.FC = () => {
   };
 
   const resetForm = () => {
+    setCode('');
     setName('');
     setPosition('');
     setSelectedWorker(null);
   };
 
   const handleAddWorker = async () => {
-    if (!name.trim()) {
-      showToast('El nombre es requerido', 'warning');
+    if (!code.trim() || !name.trim()) {
+      showToast('El código y nombre son requeridos', 'warning');
       return;
     }
 
     try {
       await addWorker({
+        code: code.trim(),
         name: name.trim(),
         identification: '',
         position: position.trim() || undefined,
@@ -78,13 +81,14 @@ export const WorkersScreen: React.FC = () => {
   };
 
   const handleEditWorker = async () => {
-    if (!selectedWorker || !name.trim()) {
-      showToast('El nombre es requerido', 'warning');
+    if (!selectedWorker || !code.trim() || !name.trim()) {
+      showToast('El código y nombre son requeridos', 'warning');
       return;
     }
 
     try {
       await updateWorker(selectedWorker.id, {
+        code: code.trim(),
         name: name.trim(),
         identification: '',
         position: position.trim() || undefined,
@@ -144,6 +148,7 @@ export const WorkersScreen: React.FC = () => {
 
   const openEditWorker = (worker: Worker) => {
     setSelectedWorker(worker);
+    setCode(worker.code);
     setName(worker.name);
     setPosition(worker.position || '');
     setShowEditWorker(true);
@@ -152,7 +157,7 @@ export const WorkersScreen: React.FC = () => {
   const renderWorkerItem = ({ item }: { item: Worker }) => (
     <ListItem
       title={item.name}
-      subtitle={item.position || 'Sin cargo asignado'}
+      subtitle={item.code ? `${item.code} • ${item.position || 'Sin cargo asignado'}` : (item.position || 'Sin cargo asignado')}
       leftIcon={
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
@@ -272,6 +277,14 @@ export const WorkersScreen: React.FC = () => {
         <Text style={styles.sheetTitle}>Nuevo Trabajador</Text>
         
         <Input
+          label="Código"
+          placeholder="Ej: 001"
+          value={code}
+          onChangeText={(text) => setCode(text.replace(/[^0-9]/g, ''))}
+          keyboardType="numeric"
+        />
+
+        <Input
           label="Nombre completo"
           placeholder="Ej: María García"
           value={name}
@@ -295,6 +308,14 @@ export const WorkersScreen: React.FC = () => {
       <BottomSheet visible={showEditWorker} onClose={() => { setShowEditWorker(false); resetForm(); }}>
         <Text style={styles.sheetTitle}>Editar Trabajador</Text>
         
+        <Input
+          label="Código"
+          placeholder="Ej: 001"
+          value={code}
+          onChangeText={(text) => setCode(text.replace(/[^0-9]/g, ''))}
+          keyboardType="numeric"
+        />
+
         <Input
           label="Nombre completo"
           placeholder="Ej: María García"

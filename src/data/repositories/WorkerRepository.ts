@@ -28,6 +28,17 @@ export class WorkerRepository {
     );
   }
 
+  static async existsByCode(code: string, excludeId?: string): Promise<boolean> {
+    if (!code) return false;
+    const workers = await this.getAll();
+    const normalizedCode = code.trim().toUpperCase();
+    return workers.some(w => 
+      w.code && w.code.toUpperCase() === normalizedCode && 
+      w.id !== excludeId && 
+      !w.isDeleted
+    );
+  }
+
   static async create(input: CreateWorkerInput): Promise<Worker> {
     const workers = await this.getAll();
     const now = new Date().toISOString();
@@ -35,6 +46,14 @@ export class WorkerRepository {
     const nameExists = await this.existsByName(input.name);
     if (nameExists) {
       throw new Error('Ya existe un trabajador con este nombre');
+    }
+
+    // Solo validar código si no está vacío
+    if (input.code && input.code.trim()) {
+      const codeExists = await this.existsByCode(input.code);
+      if (codeExists) {
+        throw new Error('Ya existe un trabajador con este código');
+      }
     }
     
     const newWorker: Worker = {
@@ -63,6 +82,13 @@ export class WorkerRepository {
       const nameExists = await this.existsByName(input.name, id);
       if (nameExists) {
         throw new Error('Ya existe un trabajador con este nombre');
+      }
+    }
+
+    if (input.code && input.code.trim()) {
+      const codeExists = await this.existsByCode(input.code, id);
+      if (codeExists) {
+        throw new Error('Ya existe un trabajador con este código');
       }
     }
 

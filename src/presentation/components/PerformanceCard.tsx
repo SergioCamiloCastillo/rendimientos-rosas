@@ -17,86 +17,64 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
   onDelete,
 }) => {
   // Calcular meta total basada en horas trabajadas
-  const totalHours = record.totalHours || 0;
+  const totalHoursRaw = record.totalHours || 0;
+  const totalHours = Math.round(totalHoursRaw * 10) / 10; // Redondear a 1 decimal
   const hasHours = totalHours > 0;
   
   // Para registros con horas: meta = expectedPerformance * totalHours
   // Para registros antiguos sin horas: usar expectedPerformance directamente
   const expectedTotal = hasHours 
-    ? record.expectedPerformance * totalHours 
+    ? Math.round(record.expectedPerformance * totalHours)
     : record.expectedPerformance;
   
   const percentage = expectedTotal > 0 
     ? Math.round((record.achievedPerformance / expectedTotal) * 100)
     : 0;
 
-  // Formatear turnos para mostrar
-  const shiftsText = record.shifts && record.shifts.length > 0
-    ? record.shifts.map(s => `${s.startTime}-${s.endTime}`).join(', ')
-    : '';
+  // Calcular duración de un turno en horas
+  const calculateShiftHours = (startTime: string, endTime: string): number => {
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+    const startMinutes = startH * 60 + startM;
+    const endMinutes = endH * 60 + endM;
+    return (endMinutes - startMinutes) / 60;
+  };
+
+  // Convertir hora 24h a formato 12h AM/PM
+  const formatTimeToAMPM = (time: string): string => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  // Usar porcentaje calculado para determinar si cumplió la meta
+  const metGoal = percentage >= 100;
 
   return (
     <TouchableOpacity
-      style={[styles.card, !record.metGoal && styles.cardNotMet]}
+      style={[styles.card, !metGoal && styles.cardNotMet]}
       onPress={onPress}
       activeOpacity={0.7}
     >
       <View style={styles.header}>
-        <View style={styles.dateContainer}>
-          <Text style={styles.date}>
-            {format(new Date(record.date + 'T12:00:00'), 'dd MMM', { locale: es })}
+        <View style={styles.leftHeader}>
+          <Text style={styles.workerName}>
+            {record.workerCode ? `${record.workerCode} - ` : ''}{record.workerName}
           </Text>
+          <Text style={styles.activityName}>{record.activityName}</Text>
         </View>
         <View
           style={[
             styles.statusBadge,
-            record.metGoal ? styles.successBadge : styles.dangerBadge,
+            metGoal ? styles.successBadge : styles.dangerBadge,
           ]}
         >
           <Text
             style={[
               styles.statusText,
-              record.metGoal ? styles.successText : styles.dangerText,
-            ]}
-          >
-            {record.metGoal ? 'Cumplió' : 'No cumplió'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.workerName}>{record.workerName}</Text>
-        <Text style={styles.activityName}>{record.activityName}</Text>
-        {totalHours > 0 && (
-          <Text style={styles.hoursText}>
-            {totalHours.toFixed(1)}h trabajadas {shiftsText && `(${shiftsText})`}
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.performanceContainer}>
-        <View style={styles.performanceItem}>
-          <Text style={styles.performanceLabel}>Logrado</Text>
-          <Text style={styles.performanceValue}>
-            {record.achievedPerformance} {record.activityUnit}
-          </Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.performanceItem}>
-          <Text style={styles.performanceLabel}>
-            {hasHours ? `Meta (${totalHours.toFixed(1)}h)` : 'Meta'}
-          </Text>
-          <Text style={styles.performanceValue}>
-            {hasHours ? expectedTotal.toFixed(0) : record.expectedPerformance} {record.activityUnit}
-          </Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.performanceItem}>
-          <Text style={styles.performanceLabel}>%</Text>
-          <Text
-            style={[
-              styles.percentageValue,
-              percentage >= 100 ? styles.successColor : styles.dangerColor,
+              metGoal ? styles.successText : styles.dangerText,
             ]}
           >
             {percentage}%
@@ -104,16 +82,54 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
         </View>
       </View>
 
-      {record.notes && (
-        <Text style={styles.notes} numberOfLines={2}>
-          {record.notes}
-        </Text>
+      {hasHours && record.shifts && record.shifts.length > 0 && (
+        <View style={styles.shiftsContainer}>
+          {record.shifts.map((shift, index) => {
+            const shiftHours = calculateShiftHours(shift.startTime, shift.endTime);
+            return (
+              <View key={index} style={styles.shiftRow}>
+                <View style={styles.shiftTimeInfo}>
+                  <Text style={styles.shiftTime}>
+                    {formatTimeToAMPM(shift.startTime)} - {formatTimeToAMPM(shift.endTime)}
+                  </Text>
+                  <Text style={styles.shiftHours}>({shiftHours.toFixed(1)}h)</Text>
+                </View>
+                <Text style={styles.shiftPerformance}>
+                  {shift.achievedPerformance} {record.activityUnit}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
       )}
 
-      {onDelete && (
-        <TouchableOpacity style={styles.deleteButton} onPress={onDelete}>
-          <Text style={styles.deleteText}>Eliminar</Text>
-        </TouchableOpacity>
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Total</Text>
+          <Text style={styles.statValue}>
+            {record.achievedPerformance} {record.activityUnit}
+          </Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Meta</Text>
+          <Text style={styles.statValue}>
+            {hasHours ? expectedTotal.toFixed(0) : record.expectedPerformance} {record.activityUnit}
+          </Text>
+        </View>
+        {hasHours && (
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Horas</Text>
+            <Text style={styles.statValue}>{totalHours.toFixed(1)}h</Text>
+          </View>
+        )}
+      </View>
+
+      {record.notes && (
+        <View style={styles.notesContainer}>
+          <Text style={styles.notes} numberOfLines={2}>
+            {record.notes}
+          </Text>
+        </View>
       )}
     </TouchableOpacity>
   );
@@ -137,25 +153,30 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
   },
-  dateContainer: {
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+  leftHeader: {
+    flex: 1,
+    marginRight: 12,
   },
-  date: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.primary,
-    textTransform: 'capitalize',
+  workerName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  activityName: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '500',
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 60,
+    alignItems: 'center',
   },
   successBadge: {
     backgroundColor: colors.successLight,
@@ -164,8 +185,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dangerLight,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
   },
   successText: {
     color: colors.success,
@@ -173,73 +194,72 @@ const styles = StyleSheet.create({
   dangerText: {
     color: colors.danger,
   },
-  content: {
-    marginBottom: 12,
+  shiftsContainer: {
+    gap: 8,
+    marginBottom: 16,
   },
-  workerName: {
-    fontSize: 16,
+  shiftRow: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  shiftTimeInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  shiftTime: {
+    fontSize: 13,
     fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  activityName: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  hoursText: {
-    fontSize: 12,
     color: colors.primary,
-    marginTop: 4,
-    fontWeight: '500',
   },
-  performanceContainer: {
+  shiftHours: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.primary,
+    opacity: 0.7,
+  },
+  shiftPerformance: {
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  statsRow: {
     flexDirection: 'row',
     backgroundColor: colors.background,
     borderRadius: 12,
-    padding: 12,
+    padding: 16,
+    gap: 16,
   },
-  performanceItem: {
+  statItem: {
     flex: 1,
     alignItems: 'center',
   },
-  performanceLabel: {
-    fontSize: 12,
+  statLabel: {
+    fontSize: 11,
     color: colors.textSecondary,
     marginBottom: 4,
-  },
-  performanceValue: {
-    fontSize: 14,
+    textTransform: 'uppercase',
     fontWeight: '600',
-    color: colors.text,
   },
-  percentageValue: {
+  statValue: {
     fontSize: 16,
     fontWeight: '700',
+    color: colors.text,
   },
-  successColor: {
-    color: colors.success,
-  },
-  dangerColor: {
-    color: colors.danger,
-  },
-  divider: {
-    width: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 8,
+  notesContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   notes: {
     fontSize: 13,
     color: colors.textSecondary,
-    marginTop: 12,
-    fontStyle: 'italic',
-  },
-  deleteButton: {
-    marginTop: 12,
-    alignSelf: 'flex-end',
-  },
-  deleteText: {
-    fontSize: 14,
-    color: colors.danger,
-    fontWeight: '500',
+    lineHeight: 18,
   },
 });

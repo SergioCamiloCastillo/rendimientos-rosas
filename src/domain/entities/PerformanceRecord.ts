@@ -42,6 +42,7 @@ export type CreatePerformanceRecordInput = z.infer<typeof CreatePerformanceRecor
 
 export interface PerformanceRecordWithDetails extends PerformanceRecord {
   workerName: string;
+  workerCode: string;
   activityName: string;
   activityUnit: string;
 }

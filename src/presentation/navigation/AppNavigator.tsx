@@ -10,6 +10,7 @@ import {
   ActivitiesScreen,
   RecordsScreen,
   ExportScreen,
+  StatsScreen,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -76,6 +77,13 @@ export const AppNavigator: React.FC = () => {
           options={{
             tabBarLabel: 'Exportar',
             tabBarIcon: ({ focused }) => <TabIcon icon="file-download" focused={focused} />,
+          }}
+        />
+        <Tab.Screen
+          name="Stats"
+          component={StatsScreen}
+          options={{
+            tabBarItemStyle: { display: 'none' },
           }}
         />
       </Tab.Navigator>

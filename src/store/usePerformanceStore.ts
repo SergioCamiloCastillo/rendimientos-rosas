@@ -48,6 +48,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
   fetchRecords: async () => {
     set({ isLoading: true, error: null });
     try {
+      // Recalcular metGoal de todos los registros al cargar
+      await PerformanceRepository.recalculateAllMetGoals();
       const { filters } = get();
       const records = await PerformanceRepository.getWithDetails(filters);
       set({ records, isLoading: false });
@@ -58,6 +60,7 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   fetchTodayRecords: async () => {
     try {
+      await PerformanceRepository.recalculateAllMetGoals();
       const todayRecords = await PerformanceRepository.getTodayRecords();
       set({ todayRecords });
     } catch (error) {
@@ -67,6 +70,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   fetchRecordsByDate: async (date: Date) => {
     try {
+      await PerformanceRepository.recalculateAllMetGoals();
+      
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
@@ -100,6 +105,8 @@ export const usePerformanceStore = create<PerformanceState>((set, get) => ({
 
   fetchStatsByDate: async (date: Date) => {
     try {
+      await PerformanceRepository.recalculateAllMetGoals();
+      
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');

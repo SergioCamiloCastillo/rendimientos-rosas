@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme';
 import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
@@ -36,6 +37,8 @@ export const DashboardScreen: React.FC = () => {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [notes, setNotes] = useState('');
+  const [editingShifts, setEditingShifts] = useState<any[]>([]);
+  const [shiftErrors, setShiftErrors] = useState<number[]>([]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const { showToast } = useToast();
@@ -83,6 +86,13 @@ export const DashboardScreen: React.FC = () => {
     loadData();
   }, []);
 
+  // Refrescar datos cuando el Dashboard recibe foco (al volver de otras pantallas)
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [selectedDate])
+  );
+
   const loadData = async () => {
     await Promise.all([
       fetchWorkers(),
@@ -127,6 +137,15 @@ export const DashboardScreen: React.FC = () => {
   const timeToMinutes = (time: string): number => {
     const [hours, minutes] = time.split(':').map(Number);
     return hours * 60 + minutes;
+  };
+
+  // Convertir hora 24h a formato 12h AM/PM
+  const formatTimeToAMPM = (time: string): string => {
+    if (!time) return '';
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
   };
 
   const checkTimeOverlap = (newStart: string, newEnd: string, existingShifts: any[]): boolean => {
@@ -223,22 +242,78 @@ export const DashboardScreen: React.FC = () => {
     setSelectedActivity(record.activityId);
     setAchievedPerformance(record.achievedPerformance.toString());
     setNotes(record.notes || '');
+    setEditingShifts(record.shifts ? [...record.shifts] : []);
+    setShiftErrors([]);
     setShowEditRecord(true);
   };
 
+  const handleUpdateShift = (index: number, field: string, value: any) => {
+    const newShifts = [...editingShifts];
+    newShifts[index] = { ...newShifts[index], [field]: value };
+    setEditingShifts(newShifts);
+    // Limpiar errores cuando el usuario modifica un turno
+    if (shiftErrors.includes(index)) {
+      setShiftErrors(shiftErrors.filter(i => i !== index));
+    }
+  };
+
+  const handleDeleteShift = (index: number) => {
+    const newShifts = editingShifts.filter((_, i) => i !== index);
+    setEditingShifts(newShifts);
+  };
+
   const handleUpdateRecord = async () => {
-    if (!editingRecord || !achievedPerformance) {
-      showToast('El rendimiento es requerido', 'warning');
+    if (!editingRecord) {
+      showToast('Error al actualizar', 'error');
       return;
     }
 
-    const activity = activities.find(a => a.id === selectedActivity);
-    if (!activity) return;
+    if (editingShifts.length === 0) {
+      showToast('Debe haber al menos un turno', 'error');
+      return;
+    }
+
+    // Validar que todos los turnos tengan datos válidos
+    for (const shift of editingShifts) {
+      if (!shift.startTime || !shift.endTime || !shift.achievedPerformance) {
+        showToast('Todos los turnos deben tener horarios y rendimiento', 'error');
+        return;
+      }
+      const hours = calculateHours(shift.startTime, shift.endTime);
+      if (hours <= 0) {
+        showToast('La hora de fin debe ser mayor a la hora de inicio', 'error');
+        return;
+      }
+    }
+
+    // Validar que no haya solapamiento entre turnos
+    const overlappingShifts: number[] = [];
+    for (let i = 0; i < editingShifts.length; i++) {
+      for (let j = i + 1; j < editingShifts.length; j++) {
+        if (checkTimeOverlap(editingShifts[i].startTime, editingShifts[i].endTime, [editingShifts[j]])) {
+          if (!overlappingShifts.includes(i)) overlappingShifts.push(i);
+          if (!overlappingShifts.includes(j)) overlappingShifts.push(j);
+        }
+      }
+    }
+    
+    if (overlappingShifts.length > 0) {
+      setShiftErrors(overlappingShifts);
+      showToast('Los turnos no pueden solaparse entre sí', 'error');
+      return;
+    }
+
+    // Calcular totales
+    const totalAchieved = editingShifts.reduce((sum, s) => sum + parseFloat(s.achievedPerformance), 0);
+    const totalHours = editingShifts.reduce((sum, s) => {
+      return sum + calculateHours(s.startTime, s.endTime);
+    }, 0);
 
     try {
       await updateRecord(editingRecord.id, {
-        achievedPerformance: parseFloat(achievedPerformance),
-        expectedPerformance: activity.expectedPerformance,
+        shifts: editingShifts,
+        achievedPerformance: totalAchieved,
+        totalHours,
         notes: notes || undefined,
       });
       
@@ -399,14 +474,16 @@ export const DashboardScreen: React.FC = () => {
               </Text>
             </View>
           ) : (
-            selectedDateRecords.map(record => (
-              <PerformanceCard
-                key={record.id}
-                record={record}
-                onPress={() => handleEditRecord(record)}
-                onDelete={() => handleDeleteRecord(record.id)}
-              />
-            ))
+            [...selectedDateRecords]
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+              .map(record => (
+                <PerformanceCard
+                  key={record.id}
+                  record={record}
+                  onPress={() => handleEditRecord(record)}
+                  onDelete={() => handleDeleteRecord(record.id)}
+                />
+              ))
           )}
         </View>
       </Animated.ScrollView>
@@ -502,29 +579,74 @@ export const DashboardScreen: React.FC = () => {
       <BottomSheet visible={showEditRecord} onClose={() => { resetForm(); setShowEditRecord(false); }}>
         <Text style={styles.sheetTitle}>Editar Registro</Text>
         
-        <View style={styles.editInfo}>
-          <Text style={styles.editInfoLabel}>Trabajador</Text>
-          <Text style={styles.editInfoValue}>{editingRecord?.workerName}</Text>
-        </View>
-
-        <View style={styles.editInfo}>
-          <Text style={styles.editInfoLabel}>Actividad</Text>
-          <Text style={styles.editInfoValue}>{editingRecord?.activityName}</Text>
+        <View style={styles.editInfoCard}>
+          <View style={styles.editInfoRow}>
+            <View style={styles.editInfoItem}>
+              <Text style={styles.editInfoLabel}>Trabajador</Text>
+              <Text style={styles.editInfoValue}>
+                {editingRecord?.workerCode ? `${editingRecord.workerCode} - ` : ''}{editingRecord?.workerName}
+              </Text>
+            </View>
+            <View style={styles.editInfoItem}>
+              <Text style={styles.editInfoLabel}>Actividad</Text>
+              <Text style={styles.editInfoValue}>{editingRecord?.activityName}</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.metaInfo}>
           <Text style={styles.metaText}>
-            Meta: {editingRecord?.expectedPerformance} {editingRecord?.activityUnit}
+            Meta: {editingRecord?.expectedPerformance} {editingRecord?.activityUnit}/hora
           </Text>
         </View>
 
-        <Input
-          label="Rendimiento Logrado"
-          placeholder="Ej: 150"
-          keyboardType="numeric"
-          value={achievedPerformance}
-          onChangeText={setAchievedPerformance}
-        />
+        <Text style={styles.editSectionTitle}>Turnos</Text>
+        {editingShifts.map((shift: any, index: number) => (
+          <View key={index} style={[styles.editShiftCard, shiftErrors.includes(index) && styles.editShiftCardError]}>
+            <View style={styles.editShiftHeader}>
+              <Text style={styles.editShiftLabel}>Turno {index + 1}</Text>
+              {editingShifts.length > 1 && (
+                <TouchableOpacity 
+                  onPress={() => handleDeleteShift(index)}
+                  style={styles.deleteShiftBtn}
+                >
+                  <MaterialIcons name="close" size={20} color={colors.danger} />
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            <View style={styles.editShiftFields}>
+              <View style={styles.editShiftTimeRow}>
+                <View style={styles.editShiftTimeField}>
+                  <TimePicker
+                    label="Hora Inicio"
+                    placeholder="08:00"
+                    value={shift.startTime}
+                    onChange={(value) => handleUpdateShift(index, 'startTime', value)}
+                  />
+                </View>
+                <View style={styles.editShiftTimeField}>
+                  <TimePicker
+                    label="Hora Fin"
+                    placeholder="17:00"
+                    value={shift.endTime}
+                    onChange={(value) => handleUpdateShift(index, 'endTime', value)}
+                  />
+                </View>
+              </View>
+              
+              <View>
+                <Input
+                  label="Rendimiento Logrado"
+                  placeholder="Ej: 340"
+                  keyboardType="numeric"
+                  value={shift.achievedPerformance.toString()}
+                  onChangeText={(value) => handleUpdateShift(index, 'achievedPerformance', parseFloat(value) || 0)}
+                />
+              </View>
+            </View>
+          </View>
+        ))}
 
         <Input
           label="Notas (opcional)"
@@ -536,7 +658,7 @@ export const DashboardScreen: React.FC = () => {
         />
 
         <Button
-          title="Actualizar Registro"
+          title="Guardar Cambios"
           onPress={handleUpdateRecord}
           loading={isLoading}
         />
@@ -825,16 +947,28 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '500',
   },
-  editInfo: {
-    marginBottom: 12,
+  editInfoCard: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  editInfoRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  editInfoItem: {
+    flex: 1,
   },
   editInfoLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    fontWeight: '600',
   },
   editInfoValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.text,
   },
@@ -880,5 +1014,69 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  shiftDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.primaryLight,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  shiftDetailTime: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  shiftDetailPerf: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  editSectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  editShiftCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  editShiftCardError: {
+    borderColor: colors.danger,
+    borderWidth: 2,
+    backgroundColor: colors.dangerLight,
+  },
+  editShiftHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  editShiftLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  deleteShiftBtn: {
+    padding: 4,
+  },
+  editShiftFields: {
+    gap: 12,
+  },
+  editShiftTimeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  editShiftTimeField: {
+    flex: 1,
   },
 });

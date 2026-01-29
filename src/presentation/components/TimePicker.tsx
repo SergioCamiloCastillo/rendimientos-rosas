@@ -34,6 +34,15 @@ export const TimePicker: React.FC<TimePickerProps> = ({
     return `${hours}:${minutes}`;
   };
 
+  // Formatear para mostrar en formato 12h AM/PM
+  const formatTimeDisplay = (timeStr: string): string => {
+    if (!timeStr) return '';
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
   const handlePress = () => {
     setTempDate(value ? parseTimeToDate(value) : new Date());
     setShowPicker(true);
@@ -66,7 +75,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
       <Text style={styles.label}>{label}</Text>
       <TouchableOpacity style={styles.input} onPress={handlePress}>
         <Text style={[styles.inputText, !value && styles.placeholder]}>
-          {value || placeholder}
+          {value ? formatTimeDisplay(value) : placeholder}
         </Text>
       </TouchableOpacity>
 

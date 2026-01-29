@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
 import { PerformanceCard, BottomSheet, Select, Button, EmptyState } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
@@ -19,6 +20,7 @@ import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
 type FilterPeriod = 'today' | 'week' | 'month' | 'all';
 
 export const RecordsScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
@@ -132,47 +134,57 @@ export const RecordsScreen: React.FC = () => {
         <Text style={styles.title}>Historial</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate('Stats')}
+          >
+            <MaterialIcons name="bar-chart" size={24} color={colors.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.headerButton, hasActiveFilters && styles.headerButtonActive]}
             onPress={() => setShowFilters(true)}
           >
             <MaterialIcons name="filter-list" size={24} color={hasActiveFilters ? colors.primary : colors.textSecondary} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => setShowExportOptions(true)}
-          >
-            <MaterialIcons name="file-download" size={24} color={colors.textSecondary} />
-          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{records.length}</Text>
-          <Text style={styles.statLabel}>Registros</Text>
+      <View style={styles.statsContainer}>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{records.length}</Text>
+            <Text style={styles.statLabel}>REGISTROS</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.success }]}>{stats.metGoal}</Text>
+            <Text style={styles.statLabel}>CUMPLIERON</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.danger }]}>{stats.notMetGoal}</Text>
+            <Text style={styles.statLabel}>NO CUMPLIERON</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>{stats.percentage}%</Text>
+            <Text style={styles.statLabel}>ÉXITO</Text>
+          </View>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: colors.success }]}>{stats.metGoal}</Text>
-          <Text style={styles.statLabel}>Cumplieron</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: colors.danger }]}>{stats.notMetGoal}</Text>
-          <Text style={styles.statLabel}>No cumplieron</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: colors.primary }]}>{stats.percentage}%</Text>
-          <Text style={styles.statLabel}>Éxito</Text>
-        </View>
+        {records.some(r => r.totalHours && r.totalHours > 0) && (
+          <View style={styles.hoursInfo}>
+            <MaterialIcons name="schedule" size={16} color={colors.primary} />
+            <Text style={styles.hoursText}>
+              {records.reduce((sum, r) => sum + (r.totalHours || 0), 0).toFixed(1)}h totales trabajadas
+            </Text>
+          </View>
+        )}
       </View>
 
       {hasActiveFilters && (
         <View style={styles.activeFilters}>
           <Text style={styles.activeFiltersText}>Filtros activos</Text>
           <TouchableOpacity onPress={resetFilters}>
-            <Text style={styles.clearFiltersText}>Limpiar</Text>
+            <Text style={styles.clearFiltersText}>Limpiar filtro</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -360,13 +372,15 @@ const styles = StyleSheet.create({
   headerIcon: {
     fontSize: 20,
   },
-  statsRow: {
-    flexDirection: 'row',
+  statsContainer: {
     backgroundColor: colors.surface,
     marginHorizontal: 20,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
   },
   statItem: {
     flex: 1,
@@ -378,14 +392,30 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.textSecondary,
     marginTop: 4,
+    fontWeight: '600',
   },
   statDivider: {
     width: 1,
     backgroundColor: colors.border,
     marginHorizontal: 8,
+  },
+  hoursInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 6,
+  },
+  hoursText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '600',
   },
   activeFilters: {
     flexDirection: 'row',

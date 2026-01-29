@@ -1,4 +1,4 @@
-import { Activity, CreateActivityInput, ActivitySchema } from '../../domain/entities';
+import { Activity, CreateActivityInput, ActivitySchema, PerformanceRecord } from '../../domain/entities';
 import { AsyncStorageAdapter, STORAGE_KEYS } from '../../infrastructure/storage/AsyncStorageAdapter';
 import uuid from 'react-native-uuid';
 
@@ -54,7 +54,45 @@ export class ActivityRepository {
     activities[index] = validated;
     await AsyncStorageAdapter.setItem(STORAGE_KEYS.ACTIVITIES, activities);
     
+    // Si cambió el expectedPerformance, actualizar todos los registros existentes
+    if (input.expectedPerformance !== undefined) {
+      await this.updateRecordsWithNewExpectedPerformance(id, input.expectedPerformance);
+    }
+    
     return validated;
+  }
+
+  static async updateRecordsWithNewExpectedPerformance(activityId: string, newExpectedPerformance: number): Promise<void> {
+    const records = await AsyncStorageAdapter.getItem<PerformanceRecord[]>(STORAGE_KEYS.PERFORMANCE_RECORDS);
+    if (!records) return;
+
+    let updated = false;
+    const now = new Date().toISOString();
+
+    for (let i = 0; i < records.length; i++) {
+      if (records[i].activityId === activityId && !records[i].isDeleted) {
+        const record = records[i];
+        const totalHours = record.totalHours || 0;
+        
+        // Calcular nuevo metGoal
+        const expectedTotal = totalHours > 0 
+          ? newExpectedPerformance * totalHours 
+          : newExpectedPerformance;
+        const metGoal = record.achievedPerformance >= expectedTotal;
+
+        records[i] = {
+          ...record,
+          expectedPerformance: newExpectedPerformance,
+          metGoal,
+          updatedAt: now,
+        };
+        updated = true;
+      }
+    }
+
+    if (updated) {
+      await AsyncStorageAdapter.setItem(STORAGE_KEYS.PERFORMANCE_RECORDS, records);
+    }
   }
 
   static async softDelete(id: string): Promise<boolean> {
