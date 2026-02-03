@@ -1,9 +1,41 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 import XLSX from 'xlsx-js-style';
 import { PerformanceRecordWithDetails } from '../domain/entities';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+
+// Función para abrir archivo con app por defecto
+const openFileWithDefaultApp = async (uri: string) => {
+  if (Platform.OS === 'android') {
+    try {
+      // Import dinámico para evitar errores en Expo Go
+      const IntentLauncher = await import('expo-intent-launcher');
+      const contentUri = await FileSystem.getContentUriAsync(uri);
+      await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+        data: contentUri,
+        flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+    } catch (error) {
+      // Fallback a Sharing si IntentLauncher falla (ej: Expo Go)
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        });
+      }
+    }
+  } else {
+    // En iOS usamos sharing que permite "Abrir en..."
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        UTI: 'com.microsoft.excel.xlsx',
+      });
+    }
+  }
+};
 
 export interface ExportOptions {
   filename?: string;
@@ -203,13 +235,7 @@ export async function exportToExcel(
     encoding: 'base64',
   });
 
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: 'Guardar o Compartir Rendimientos',
-      UTI: 'com.microsoft.excel.xlsx',
-    });
-  }
+  await openFileWithDefaultApp(uri);
 }
 
 export async function exportByActivity(
@@ -265,13 +291,7 @@ export async function exportByActivity(
     encoding: 'base64',
   });
 
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: 'Guardar o Compartir por Actividad',
-      UTI: 'com.microsoft.excel.xlsx',
-    });
-  }
+  await openFileWithDefaultApp(uri);
 }
 
 export async function exportByWorker(
@@ -332,13 +352,7 @@ export async function exportByWorker(
     encoding: 'base64',
   });
 
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: 'Guardar o Compartir por Trabajador',
-      UTI: 'com.microsoft.excel.xlsx',
-    });
-  }
+  await openFileWithDefaultApp(uri);
 }
 
 // Exportar reporte semanal con todos los trabajadores
@@ -441,11 +455,5 @@ export async function exportWeeklyReport(
     encoding: 'base64',
   });
 
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      dialogTitle: 'Guardar o Compartir Reporte Semanal',
-      UTI: 'com.microsoft.excel.xlsx',
-    });
-  }
+  await openFileWithDefaultApp(uri);
 }

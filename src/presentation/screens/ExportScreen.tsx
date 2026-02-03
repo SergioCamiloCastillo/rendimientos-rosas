@@ -16,7 +16,7 @@ import { usePerformanceStore, useWorkerStore, useActivityStore } from '../../sto
 import { exportToExcel, exportByActivity, exportByWorker, exportWeeklyReport } from '../../utils/excelExport';
 import { useToast } from '../context/ToastContext';
 import { PerformanceRepository } from '../../data/repositories';
-import { format, startOfWeek, endOfWeek, subWeeks } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subWeeks, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button, Select } from '../components';
 
@@ -164,7 +164,21 @@ export const ExportScreen: React.FC = () => {
 
         {/* Filtros opcionales */}
         <View style={styles.filterSection}>
-          <Text style={styles.sectionTitle}>Filtros opcionales</Text>
+          <View style={styles.filterHeader}>
+            <Text style={styles.sectionTitle}>Filtros opcionales</Text>
+            {(selectedWorker || selectedActivity) && (
+              <TouchableOpacity 
+                style={styles.clearFiltersBtn}
+                onPress={() => {
+                  setSelectedWorker('');
+                  setSelectedActivity('');
+                }}
+              >
+                <MaterialIcons name="clear" size={16} color={colors.danger} />
+                <Text style={styles.clearFiltersText}>Limpiar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
           
           <Select
             label="Trabajador (opcional)"
@@ -187,22 +201,26 @@ export const ExportScreen: React.FC = () => {
         <View style={styles.options}>
           <Text style={styles.sectionTitle}>Tipo de reporte</Text>
           
-          <TouchableOpacity 
-            style={styles.exportOption}
-            onPress={() => handleExport('weekly')}
-            activeOpacity={0.7}
-            disabled={exporting}
-          >
-            <View style={[styles.optionIcon, { backgroundColor: '#E0F2FE' }]}>
-              <MaterialIcons name="date-range" size={24} color="#0284C7" />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Reporte Semanal</Text>
-              <Text style={styles.optionSubtitle}>Resumen + detalle por trabajador</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
+          {/* Reporte Semanal - solo si no hay filtros y el rango es de 7 días o menos */}
+          {!selectedWorker && !selectedActivity && differenceInDays(endDate, startDate) <= 7 && (
+            <TouchableOpacity 
+              style={styles.exportOption}
+              onPress={() => handleExport('weekly')}
+              activeOpacity={0.7}
+              disabled={exporting}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: '#E0F2FE' }]}>
+                <MaterialIcons name="date-range" size={24} color="#0284C7" />
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Reporte Semanal</Text>
+                <Text style={styles.optionSubtitle}>Resumen + detalle por trabajador</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          )}
 
+          {/* Todos los registros - siempre disponible */}
           <TouchableOpacity 
             style={styles.exportOption}
             onPress={() => handleExport('all')}
@@ -213,43 +231,67 @@ export const ExportScreen: React.FC = () => {
               <MaterialIcons name="description" size={24} color={colors.primary} />
             </View>
             <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Todos los registros</Text>
-              <Text style={styles.optionSubtitle}>Exportar todos los datos en una hoja</Text>
+              <Text style={styles.optionTitle}>
+                {selectedWorker || selectedActivity ? 'Registros filtrados' : 'Todos los registros'}
+              </Text>
+              <Text style={styles.optionSubtitle}>
+                {selectedWorker && selectedActivity 
+                  ? 'Datos del trabajador y actividad seleccionados'
+                  : selectedWorker 
+                    ? 'Datos del trabajador seleccionado'
+                    : selectedActivity 
+                      ? 'Datos de la actividad seleccionada'
+                      : 'Exportar todos los datos en una hoja'}
+              </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.exportOption}
-            onPress={() => handleExport('byActivity')}
-            activeOpacity={0.7}
-            disabled={exporting}
-          >
-            <View style={[styles.optionIcon, { backgroundColor: colors.successLight }]}>
-              <MaterialIcons name="category" size={24} color={colors.success} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Por Actividad</Text>
-              <Text style={styles.optionSubtitle}>Una hoja por cada actividad</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
+          {/* Por Actividad - solo si no hay actividad específica seleccionada */}
+          {!selectedActivity && (
+            <TouchableOpacity 
+              style={styles.exportOption}
+              onPress={() => handleExport('byActivity')}
+              activeOpacity={0.7}
+              disabled={exporting}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: colors.successLight }]}>
+                <MaterialIcons name="category" size={24} color={colors.success} />
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Por Actividad</Text>
+                <Text style={styles.optionSubtitle}>
+                  {selectedWorker 
+                    ? 'Una hoja por actividad del trabajador'
+                    : 'Una hoja por cada actividad'}
+                </Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          )}
 
-          <TouchableOpacity 
-            style={styles.exportOption}
-            onPress={() => handleExport('byWorker')}
-            activeOpacity={0.7}
-            disabled={exporting}
-          >
-            <View style={[styles.optionIcon, { backgroundColor: '#FEF3C7' }]}>
-              <MaterialIcons name="people" size={24} color="#F59E0B" />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Por Trabajador</Text>
-              <Text style={styles.optionSubtitle}>Una hoja por cada trabajador</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
+          {/* Por Trabajador - solo si no hay trabajador específico seleccionado */}
+          {!selectedWorker && (
+            <TouchableOpacity 
+              style={styles.exportOption}
+              onPress={() => handleExport('byWorker')}
+              activeOpacity={0.7}
+              disabled={exporting}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: '#FEF3C7' }]}>
+                <MaterialIcons name="people" size={24} color="#F59E0B" />
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Por Trabajador</Text>
+                <Text style={styles.optionSubtitle}>
+                  {selectedActivity 
+                    ? 'Una hoja por trabajador en esta actividad'
+                    : 'Una hoja por cada trabajador'}
+                </Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.infoCard}>
@@ -487,5 +529,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.primary,
     lineHeight: 20,
+  },
+  filterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  clearFiltersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: colors.dangerLight,
+    borderRadius: 16,
+  },
+  clearFiltersText: {
+    fontSize: 13,
+    color: colors.danger,
+    fontWeight: '500',
   },
 });

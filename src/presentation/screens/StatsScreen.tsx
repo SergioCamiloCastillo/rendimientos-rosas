@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
+import Svg, { Line, Circle } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme';
@@ -364,51 +365,69 @@ export const StatsScreen: React.FC = () => {
               <Text style={styles.sectionTitleWithIcon}>Tendencia de Rendimiento General</Text>
             </View>
             <View style={styles.chartContainer}>
-              <View style={styles.simpleChartWrapper}>
+              <View style={styles.svgChartWrapper}>
                 <View style={styles.simpleChartYAxis}>
                   <Text style={styles.simpleChartYLabel}>150%</Text>
                   <Text style={styles.simpleChartYLabel}>100%</Text>
                   <Text style={styles.simpleChartYLabel}>50%</Text>
                   <Text style={styles.simpleChartYLabel}>0%</Text>
                 </View>
-                <View style={styles.simpleChartArea}>
-                  <View style={[styles.simpleChartGoalLine, { bottom: `${(100 / 150) * 100}%` }]} />
-                  <View style={styles.simpleChartContent}>
+                <View style={styles.svgChartArea}>
+                  <Svg width="100%" height="100%" style={styles.svgCanvas}>
+                    <Line 
+                      x1="0" 
+                      y1={`${100 - (100 / 150) * 100}%`} 
+                      x2="100%" 
+                      y2={`${100 - (100 / 150) * 100}%`} 
+                      stroke="#9CA3AF" 
+                      strokeWidth="1.5" 
+                      strokeDasharray="5,5"
+                    />
                     {dailyStats.map((day, index) => {
+                      if (index === 0) return null;
                       const maxPct = 150;
-                      const dotBottom = Math.min((day.avgPercentage / maxPct) * 100, 100);
                       const prevDay = dailyStats[index - 1];
-                      const prevBottom = prevDay ? Math.min((prevDay.avgPercentage / maxPct) * 100, 100) : dotBottom;
-                      
+                      const padding = 8;
+                      const x1 = padding + ((index - 1) / (dailyStats.length - 1)) * (100 - padding * 2);
+                      const y1 = 5 + (100 - Math.min((prevDay.avgPercentage / maxPct) * 100, 100)) * 0.9;
+                      const x2 = padding + (index / (dailyStats.length - 1)) * (100 - padding * 2);
+                      const y2 = 5 + (100 - Math.min((day.avgPercentage / maxPct) * 100, 100)) * 0.9;
                       return (
-                        <View key={day.date} style={styles.simpleChartColumn}>
-                          <View style={styles.simpleChartDotArea}>
-                            {index > 0 && (
-                              <View 
-                                style={[
-                                  styles.simpleLineConnector,
-                                  { 
-                                    bottom: `${prevBottom}%`,
-                                    left: '-100%',
-                                    width: '100%',
-                                  }
-                                ]} 
-                              />
-                            )}
-                            <View 
-                              style={[
-                                styles.simpleChartDot,
-                                { 
-                                  bottom: `${dotBottom}%`,
-                                  backgroundColor: getPercentageColor(day.avgPercentage),
-                                }
-                              ]} 
-                            />
-                          </View>
-                          <Text style={styles.simpleChartXLabel}>{day.dateLabel}</Text>
-                        </View>
+                        <Line 
+                          key={`line-${day.date}`}
+                          x1={`${x1}%`} 
+                          y1={`${y1}%`} 
+                          x2={`${x2}%`} 
+                          y2={`${y2}%`} 
+                          stroke={colors.primary} 
+                          strokeWidth="2" 
+                        />
                       );
                     })}
+                    {dailyStats.map((day, index) => {
+                      const maxPct = 150;
+                      const padding = 8;
+                      const x = dailyStats.length > 1 
+                        ? padding + (index / (dailyStats.length - 1)) * (100 - padding * 2) 
+                        : 50;
+                      const y = 5 + (100 - Math.min((day.avgPercentage / maxPct) * 100, 100)) * 0.9;
+                      return (
+                        <Circle 
+                          key={`dot-${day.date}`}
+                          cx={`${x}%`} 
+                          cy={`${y}%`} 
+                          r="6" 
+                          fill={getPercentageColor(day.avgPercentage)} 
+                          stroke="#fff"
+                          strokeWidth="2"
+                        />
+                      );
+                    })}
+                  </Svg>
+                  <View style={styles.svgXLabels}>
+                    {dailyStats.map((day) => (
+                      <Text key={day.date} style={styles.svgXLabel}>{day.dateLabel}</Text>
+                    ))}
                   </View>
                 </View>
               </View>
@@ -450,51 +469,69 @@ export const StatsScreen: React.FC = () => {
           
           {selectedWorkerId && workerDailyStats.length > 0 && (
             <View style={styles.chartContainer}>
-              <View style={styles.simpleChartWrapper}>
+              <View style={styles.svgChartWrapper}>
                 <View style={styles.simpleChartYAxis}>
                   <Text style={styles.simpleChartYLabel}>150%</Text>
                   <Text style={styles.simpleChartYLabel}>100%</Text>
                   <Text style={styles.simpleChartYLabel}>50%</Text>
                   <Text style={styles.simpleChartYLabel}>0%</Text>
                 </View>
-                <View style={styles.simpleChartArea}>
-                  <View style={[styles.simpleChartGoalLine, { bottom: `${(100 / 150) * 100}%` }]} />
-                  <View style={styles.simpleChartContent}>
+                <View style={styles.svgChartArea}>
+                  <Svg width="100%" height="100%" style={styles.svgCanvas}>
+                    <Line 
+                      x1="0" 
+                      y1={`${100 - (100 / 150) * 100}%`} 
+                      x2="100%" 
+                      y2={`${100 - (100 / 150) * 100}%`} 
+                      stroke="#9CA3AF" 
+                      strokeWidth="1.5" 
+                      strokeDasharray="5,5"
+                    />
                     {workerDailyStats.map((day, index) => {
+                      if (index === 0) return null;
                       const maxPct = 150;
-                      const dotBottom = Math.min((day.avgPercentage / maxPct) * 100, 100);
                       const prevDay = workerDailyStats[index - 1];
-                      const prevBottom = prevDay ? Math.min((prevDay.avgPercentage / maxPct) * 100, 100) : dotBottom;
-                      
+                      const padding = 8;
+                      const x1 = padding + ((index - 1) / (workerDailyStats.length - 1)) * (100 - padding * 2);
+                      const y1 = 5 + (100 - Math.min((prevDay.avgPercentage / maxPct) * 100, 100)) * 0.9;
+                      const x2 = padding + (index / (workerDailyStats.length - 1)) * (100 - padding * 2);
+                      const y2 = 5 + (100 - Math.min((day.avgPercentage / maxPct) * 100, 100)) * 0.9;
                       return (
-                        <View key={day.date} style={styles.simpleChartColumn}>
-                          <View style={styles.simpleChartDotArea}>
-                            {index > 0 && (
-                              <View 
-                                style={[
-                                  styles.simpleLineConnector,
-                                  { 
-                                    bottom: `${prevBottom}%`,
-                                    left: '-100%',
-                                    width: '100%',
-                                  }
-                                ]} 
-                              />
-                            )}
-                            <View 
-                              style={[
-                                styles.simpleChartDot,
-                                { 
-                                  bottom: `${dotBottom}%`,
-                                  backgroundColor: getPercentageColor(day.avgPercentage),
-                                }
-                              ]} 
-                            />
-                          </View>
-                          <Text style={styles.simpleChartXLabel}>{day.dateLabel}</Text>
-                        </View>
+                        <Line 
+                          key={`line-${day.date}`}
+                          x1={`${x1}%`} 
+                          y1={`${y1}%`} 
+                          x2={`${x2}%`} 
+                          y2={`${y2}%`} 
+                          stroke={colors.primary} 
+                          strokeWidth="2" 
+                        />
                       );
                     })}
+                    {workerDailyStats.map((day, index) => {
+                      const maxPct = 150;
+                      const padding = 8;
+                      const x = workerDailyStats.length > 1 
+                        ? padding + (index / (workerDailyStats.length - 1)) * (100 - padding * 2) 
+                        : 50;
+                      const y = 5 + (100 - Math.min((day.avgPercentage / maxPct) * 100, 100)) * 0.9;
+                      return (
+                        <Circle 
+                          key={`dot-${day.date}`}
+                          cx={`${x}%`} 
+                          cy={`${y}%`} 
+                          r="6" 
+                          fill={getPercentageColor(day.avgPercentage)} 
+                          stroke="#fff"
+                          strokeWidth="2"
+                        />
+                      );
+                    })}
+                  </Svg>
+                  <View style={styles.svgXLabels}>
+                    {workerDailyStats.map((day) => (
+                      <Text key={day.date} style={styles.svgXLabel}>{day.dateLabel}</Text>
+                    ))}
                   </View>
                 </View>
               </View>
@@ -1241,5 +1278,27 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: colors.primary,
     zIndex: 0,
+  },
+  svgChartWrapper: {
+    flexDirection: 'row',
+    height: 180,
+  },
+  svgChartArea: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  svgCanvas: {
+    flex: 1,
+  },
+  svgXLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+  },
+  svgXLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    flex: 1,
   },
 });
