@@ -15,6 +15,7 @@ export interface PerformanceFilters {
   activityId?: string;
   startDate?: string;
   endDate?: string;
+  block?: string;
   metGoal?: boolean;
 }
 
@@ -223,6 +224,25 @@ export class PerformanceRepository {
 
     if (filters.endDate) {
       records = records.filter(r => r.date <= filters.endDate!);
+    }
+
+    if (filters.block) {
+      const blockFilter = filters.block.toLowerCase().trim();
+      records = records.filter(r => {
+        // Buscar en el bloque del registro (registros antiguos)
+        if (r.block && r.block.toLowerCase().trim().includes(blockFilter)) {
+          return true;
+        }
+        // Buscar en los bloques de los turnos (registros nuevos)
+        if (r.shifts && r.shifts.length > 0) {
+          for (const s of r.shifts) {
+            if (s.block && s.block.toLowerCase().trim().includes(blockFilter)) {
+              return true;
+            }
+          }
+        }
+        return false;
+      });
     }
 
     if (filters.metGoal !== undefined) {

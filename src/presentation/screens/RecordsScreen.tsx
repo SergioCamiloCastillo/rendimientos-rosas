@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
-import { PerformanceCard, BottomSheet, Select, Button, EmptyState, Sidebar, MenuButton } from '../components';
+import { PerformanceCard, BottomSheet, Select, Button, EmptyState, Sidebar, MenuButton, Input } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
 import { exportToExcel, exportByActivity, exportByWorker } from '../../utils/excelExport';
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
@@ -29,6 +29,7 @@ export const RecordsScreen: React.FC = () => {
   const [filterPeriod, setFilterPeriod] = useState<FilterPeriod>('all');
   const [filterWorker, setFilterWorker] = useState('');
   const [filterActivity, setFilterActivity] = useState('');
+  const [filterBlock, setFilterBlock] = useState('');
   const [filterMetGoal, setFilterMetGoal] = useState<string>('');
 
   const { workers, fetchWorkers } = useWorkerStore();
@@ -83,6 +84,7 @@ export const RecordsScreen: React.FC = () => {
       endDate,
       workerId: filterWorker || undefined,
       activityId: filterActivity || undefined,
+      block: filterBlock || undefined,
       metGoal: filterMetGoal === '' ? undefined : filterMetGoal === 'true',
     });
 
@@ -93,6 +95,7 @@ export const RecordsScreen: React.FC = () => {
     setFilterPeriod('all');
     setFilterWorker('');
     setFilterActivity('');
+    setFilterBlock('');
     setFilterMetGoal('');
     clearFilters();
     setShowFilters(false);
@@ -128,7 +131,7 @@ export const RecordsScreen: React.FC = () => {
     }
   };
 
-  const hasActiveFilters = filterPeriod !== 'all' || filterWorker || filterActivity || filterMetGoal !== '';
+  const hasActiveFilters = filterPeriod !== 'all' || filterWorker || filterActivity || filterBlock || filterMetGoal !== '';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -283,6 +286,13 @@ export const RecordsScreen: React.FC = () => {
           ]}
           value={filterActivity}
           onChange={setFilterActivity}
+        />
+
+        <Input
+          label="Bloque"
+          placeholder="Ej: A1, B2, Lote 3..."
+          value={filterBlock}
+          onChangeText={setFilterBlock}
         />
 
         <Select

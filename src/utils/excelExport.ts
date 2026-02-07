@@ -67,7 +67,7 @@ const calculatePercentage = (record: PerformanceRecordWithDetails): number => {
 
 // Headers del Excel
 const HEADERS = [
-  'Fecha', 'Nombre', 'Código', 'Labor', 'Hora Inicio', 'Hora Fin', 
+  'Fecha', 'Nombre', 'Código', 'Labor', 'Bloque', 'Hora Inicio', 'Hora Fin', 
   'Total Horas', 'Rend. Establecido', 'Total', '% Cumplimiento', 'Meta Total', 'Notas'
 ];
 
@@ -124,6 +124,7 @@ const applyHeaderStyles = (worksheet: XLSX.WorkSheet, totalRowIndex?: number) =>
     { wch: 20 },  // Nombre
     { wch: 10 },  // Código
     { wch: 18 },  // Labor
+    { wch: 12 },  // Bloque
     { wch: 12 },  // Hora Inicio
     { wch: 12 },  // Hora Fin
     { wch: 12 },  // Total Horas
@@ -159,6 +160,7 @@ const expandRecordsWithShifts = (records: PerformanceRecordWithDetails[]) => {
           'Nombre': record.workerName,
           'Código': record.workerCode || '',
           'Labor': record.activityName,
+          'Bloque': shift.block || record.block || '',
           'Hora Inicio': formatTimeToAMPM(shift.startTime),
           'Hora Fin': formatTimeToAMPM(shift.endTime),
           'Total Horas': shiftHours.toFixed(1),
@@ -175,6 +177,7 @@ const expandRecordsWithShifts = (records: PerformanceRecordWithDetails[]) => {
         'Nombre': record.workerName,
         'Código': record.workerCode || '',
         'Labor': record.activityName,
+        'Bloque': record.block || '',
         'Hora Inicio': '',
         'Hora Fin': '',
         'Total Horas': totalHours.toFixed(1),
@@ -213,6 +216,7 @@ export async function exportToExcel(
     'Nombre': 'TOTALES',
     'Código': '',
     'Labor': '',
+    'Bloque': '',
     'Hora Inicio': '',
     'Hora Fin': '',
     'Total Horas': '',
@@ -267,6 +271,7 @@ export async function exportByActivity(
       'Nombre': 'TOTALES',
       'Código': '',
       'Labor': activityName,
+      'Bloque': '',
       'Hora Inicio': '',
       'Hora Fin': '',
       'Total Horas': '',
@@ -328,6 +333,7 @@ export async function exportByWorker(
       'Nombre': 'TOTALES',
       'Código': workerCode,
       'Labor': '',
+      'Bloque': '',
       'Hora Inicio': '',
       'Hora Fin': '',
       'Total Horas': totalHours.toFixed(1),

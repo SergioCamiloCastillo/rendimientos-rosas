@@ -24,42 +24,50 @@ export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose }) => {
   const navigation = useNavigation();
   const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const [isVisible, setIsVisible] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      setIsVisible(true);
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
+      // Primero renderizar, luego animar
+      setShouldRender(true);
+      // Resetear valores antes de animar
+      slideAnim.setValue(-SIDEBAR_WIDTH);
+      fadeAnim.setValue(0);
+      // Pequeño delay para asegurar que el componente se renderice
+      requestAnimationFrame(() => {
+        Animated.parallel([
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            tension: 65,
+            friction: 11,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    } else if (shouldRender) {
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: -SIDEBAR_WIDTH,
-          duration: 200,
+          duration: 250,
           useNativeDriver: true,
         }),
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 200,
+          duration: 250,
           useNativeDriver: true,
         }),
       ]).start(() => {
-        setIsVisible(false);
+        setShouldRender(false);
       });
     }
   }, [visible]);
 
-  if (!isVisible && !visible) return null;
+  if (!shouldRender) return null;
 
   const navigateTo = (screen: string) => {
     onClose();

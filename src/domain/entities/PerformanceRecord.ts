@@ -4,6 +4,7 @@ import { z } from 'zod';
 export const WorkShiftSchema = z.object({
   startTime: z.string(), // HH:mm formato 24h
   endTime: z.string(), // HH:mm formato 24h
+  block: z.string().optional(), // Bloque donde se realizó el turno
   achievedPerformance: z.number().nonnegative('El rendimiento debe ser positivo o cero'),
 });
 
@@ -14,6 +15,7 @@ export const PerformanceRecordSchema = z.object({
   workerId: z.string().uuid(),
   activityId: z.string().uuid(),
   date: z.string(), // YYYY-MM-DD
+  block: z.string().optional(), // Bloque donde se realizó el trabajo
   shifts: z.array(WorkShiftSchema).default([]), // Turnos de trabajo
   achievedPerformance: z.number().nonnegative('El rendimiento debe ser positivo o cero'), // Total del día
   expectedPerformance: z.number().positive(), // Meta por hora de la actividad

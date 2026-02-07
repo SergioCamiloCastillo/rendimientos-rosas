@@ -36,6 +36,7 @@ export const DashboardScreen: React.FC = () => {
   const [achievedPerformance, setAchievedPerformance] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [block, setBlock] = useState('');
   const [notes, setNotes] = useState('');
   const [editingShifts, setEditingShifts] = useState<any[]>([]);
   const [shiftErrors, setShiftErrors] = useState<number[]>([]);
@@ -181,7 +182,7 @@ export const DashboardScreen: React.FC = () => {
   };
 
   const handleAddRecord = async () => {
-    if (!selectedWorker || !selectedActivity || !achievedPerformance || !startTime || !endTime) {
+    if (!selectedWorker || !selectedActivity || !achievedPerformance || !startTime || !endTime || !block) {
       showToast('Por favor completa todos los campos requeridos', 'error');
       return;
     }
@@ -224,6 +225,7 @@ export const DashboardScreen: React.FC = () => {
     const shift = {
       startTime,
       endTime,
+      block: block || undefined,
       achievedPerformance: parseFloat(achievedPerformance),
     };
 
@@ -255,6 +257,7 @@ export const DashboardScreen: React.FC = () => {
     setAchievedPerformance('');
     setStartTime('');
     setEndTime('');
+    setBlock('');
     setNotes('');
     setEditingRecord(null);
   };
@@ -264,6 +267,7 @@ export const DashboardScreen: React.FC = () => {
     setSelectedWorker(record.workerId);
     setSelectedActivity(record.activityId);
     setAchievedPerformance(record.achievedPerformance.toString());
+    setBlock(record.block || '');
     setNotes(record.notes || '');
     setEditingShifts(record.shifts ? [...record.shifts] : []);
     setShiftErrors([]);
@@ -298,8 +302,8 @@ export const DashboardScreen: React.FC = () => {
 
     // Validar que todos los turnos tengan datos válidos
     for (const shift of editingShifts) {
-      if (!shift.startTime || !shift.endTime || !shift.achievedPerformance) {
-        showToast('Todos los turnos deben tener horarios y rendimiento', 'error');
+      if (!shift.startTime || !shift.endTime || !shift.achievedPerformance || !shift.block) {
+        showToast('Todos los turnos deben tener bloque, horarios y rendimiento', 'error');
         return;
       }
       const hours = calculateHours(shift.startTime, shift.endTime);
@@ -328,7 +332,9 @@ export const DashboardScreen: React.FC = () => {
 
     // Convertir achievedPerformance a números y calcular totales
     const shiftsWithNumbers = editingShifts.map(s => ({
-      ...s,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      block: s.block || undefined,
       achievedPerformance: parseFloat(s.achievedPerformance.toString()) || 0,
     }));
     const totalAchieved = shiftsWithNumbers.reduce((sum, s) => sum + s.achievedPerformance, 0);
@@ -628,7 +634,7 @@ export const DashboardScreen: React.FC = () => {
         </>
       )}
 
-      <BottomSheet visible={showAddRecord} onClose={() => setShowAddRecord(false)}>
+      <BottomSheet visible={showAddRecord} onClose={() => { resetForm(); setShowAddRecord(false); }}>
         <Text style={styles.sheetTitle}>Nuevo Registro</Text>
         <Text style={styles.sheetDate}>
           {format(selectedDate, "EEEE, d 'de' MMMM yyyy", { locale: es })}
@@ -675,7 +681,13 @@ export const DashboardScreen: React.FC = () => {
               label="Hora Fin"
               placeholder="17:00"
               value={endTime}
-              onChange={setEndTime}
+              onChange={(time) => {
+                if (startTime && calculateHours(startTime, time) <= 0) {
+                  showToast('La hora fin debe ser mayor a la hora inicio', 'error');
+                  return;
+                }
+                setEndTime(time);
+              }}
             />
           </View>
         </View>
@@ -694,6 +706,14 @@ export const DashboardScreen: React.FC = () => {
           keyboardType="decimal-pad"
           value={achievedPerformance}
           onChangeText={(value) => setAchievedPerformance(value.replace(',', '.'))}
+        />
+
+        <Input
+          label="Bloque"
+          placeholder="Ej: 1, 2, 3..."
+          value={block}
+          onChangeText={setBlock}
+          keyboardType="number-pad"
         />
 
         <Input
@@ -771,14 +791,25 @@ export const DashboardScreen: React.FC = () => {
                 </View>
               </View>
               
-              <View>
-                <Input
-                  label="Rendimiento Logrado"
-                  placeholder="Ej: 340"
-                  keyboardType="decimal-pad"
-                  value={shift.achievedPerformance.toString()}
-                  onChangeText={(value) => handleUpdateShift(index, 'achievedPerformance', value.replace(',', '.'))}
-                />
+              <View style={styles.editShiftTimeRow}>
+                <View style={styles.editShiftTimeField}>
+                  <Input
+                    label="Bloque"
+                    placeholder="Ej: 1, 2..."
+                    keyboardType="number-pad"
+                    value={shift.block || ''}
+                    onChangeText={(value) => handleUpdateShift(index, 'block', value)}
+                  />
+                </View>
+                <View style={styles.editShiftTimeField}>
+                  <Input
+                    label="Rendimiento"
+                    placeholder="Ej: 340"
+                    keyboardType="decimal-pad"
+                    value={shift.achievedPerformance.toString()}
+                    onChangeText={(value) => handleUpdateShift(index, 'achievedPerformance', value.replace(',', '.'))}
+                  />
+                </View>
               </View>
             </View>
           </View>

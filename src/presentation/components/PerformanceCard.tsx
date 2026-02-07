@@ -113,6 +113,9 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
             return (
               <View key={index} style={styles.shiftRow}>
                 <View style={styles.shiftTimeInfo}>
+                  {shift.block && (
+                    <Text style={styles.shiftBlock}>B-{shift.block}</Text>
+                  )}
                   <Text style={styles.shiftTime}>
                     {formatTimeToAMPM(shift.startTime)} - {formatTimeToAMPM(shift.endTime)}
                   </Text>
@@ -264,6 +267,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  shiftBlock: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.white,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
   shiftTime: {
     fontSize: 13,
     fontWeight: '600',
@@ -302,6 +314,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.text,
+    textAlign: 'center',
+  },
+  statValueBlock: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
     textAlign: 'center',
   },
   notesContainer: {

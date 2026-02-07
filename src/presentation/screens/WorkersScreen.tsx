@@ -290,7 +290,6 @@ export const WorkersScreen: React.FC = () => {
 
         <Input
           label="Nombre completo"
-          placeholder="Ej: María García"
           value={name}
           onChangeText={setName}
         />

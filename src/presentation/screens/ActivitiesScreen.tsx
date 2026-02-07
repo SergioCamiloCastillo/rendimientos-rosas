@@ -325,8 +325,8 @@ export const ActivitiesScreen: React.FC = () => {
         <Input
           label="Meta de rendimiento"
           value={expectedPerformance}
-          onChangeText={setExpectedPerformance}
-          keyboardType="numeric"
+          onChangeText={(value) => setExpectedPerformance(value.replace(',', '.'))}
+          keyboardType="decimal-pad"
         />
 
         <View style={styles.helpText}>
@@ -370,8 +370,8 @@ export const ActivitiesScreen: React.FC = () => {
           label="Meta de rendimiento"
           placeholder="Ej: 200"
           value={expectedPerformance}
-          onChangeText={setExpectedPerformance}
-          keyboardType="numeric"
+          onChangeText={(value) => setExpectedPerformance(value.replace(',', '.'))}
+          keyboardType="decimal-pad"
         />
 
         <Button
