@@ -12,6 +12,7 @@ import {
   ExportScreen,
   StatsScreen,
   AbsencesScreen,
+  WeeklyGoalsScreen,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -90,6 +91,13 @@ export const AppNavigator: React.FC = () => {
         <Tab.Screen
           name="Absences"
           component={AbsencesScreen}
+          options={{
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tab.Screen
+          name="WeeklyGoals"
+          component={WeeklyGoalsScreen}
           options={{
             tabBarItemStyle: { display: 'none' },
           }}

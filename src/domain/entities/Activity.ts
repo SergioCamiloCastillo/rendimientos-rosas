@@ -6,6 +6,7 @@ export const ActivitySchema = z.object({
   description: z.string().optional(),
   unit: z.string().min(1, 'La unidad es requerida'), // camas, tallos/hora, etc.
   expectedPerformance: z.number().positive('El rendimiento esperado debe ser positivo'),
+  weeklyGoal: z.number().nonnegative().optional(), // Meta semanal para esta actividad
   isActive: z.boolean().default(true),
   isDeleted: z.boolean().default(false),
   createdAt: z.string().datetime(),

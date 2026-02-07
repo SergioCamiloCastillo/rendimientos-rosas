@@ -1,18 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Animated,
-  Dimensions,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { Drawer as PaperDrawer, Portal, Modal, Appbar, Divider, List } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
-
-const SIDEBAR_WIDTH = 280;
 
 interface SidebarProps {
   visible: boolean;
@@ -20,148 +11,90 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose }) => {
-  const [showRendimientosSubmenu, setShowRendimientosSubmenu] = useState(true);
+  const [expanded, setExpanded] = useState(true);
   const navigation = useNavigation();
-  const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const [shouldRender, setShouldRender] = useState(false);
-
-  useEffect(() => {
-    if (visible) {
-      // Primero renderizar, luego animar
-      setShouldRender(true);
-      // Resetear valores antes de animar
-      slideAnim.setValue(-SIDEBAR_WIDTH);
-      fadeAnim.setValue(0);
-      // Pequeño delay para asegurar que el componente se renderice
-      requestAnimationFrame(() => {
-        Animated.parallel([
-          Animated.spring(slideAnim, {
-            toValue: 0,
-            tension: 65,
-            friction: 11,
-            useNativeDriver: true,
-          }),
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      });
-    } else if (shouldRender) {
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: -SIDEBAR_WIDTH,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 250,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setShouldRender(false);
-      });
-    }
-  }, [visible]);
-
-  if (!shouldRender) return null;
 
   const navigateTo = (screen: string) => {
     onClose();
-    navigation.navigate(screen as never);
+    setTimeout(() => {
+      navigation.navigate(screen as never);
+    }, 100);
   };
 
   return (
-    <>
-      <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-        <TouchableOpacity 
-          style={StyleSheet.absoluteFill} 
-          activeOpacity={1}
-          onPress={onClose}
-        />
-      </Animated.View>
-      <Animated.View style={[styles.sidebar, { transform: [{ translateX: slideAnim }] }]}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Menú</Text>
-          <TouchableOpacity onPress={onClose}>
-            <MaterialIcons name="close" size={24} color={colors.text} />
-          </TouchableOpacity>
-        </View>
-        <ScrollView style={styles.content}>
-          <TouchableOpacity 
-            style={styles.menuSection} 
-            onPress={() => setShowRendimientosSubmenu(!showRendimientosSubmenu)}
-          >
-            <View style={styles.menuSectionHeader}>
-              <MaterialIcons name="trending-up" size={24} color={colors.primary} />
-              <Text style={styles.menuSectionTitle}>Rendimientos</Text>
-            </View>
-            <MaterialIcons 
-              name={showRendimientosSubmenu ? "expand-less" : "expand-more"} 
-              size={24} 
-              color={colors.textSecondary} 
+    <Portal>
+      <Modal
+        visible={visible}
+        onDismiss={onClose}
+        contentContainerStyle={styles.modalContainer}
+        dismissable={true}
+      >
+        <View style={styles.drawerContainer}>
+          <Appbar.Header style={styles.header} elevated>
+            <Appbar.Content 
+              title="Menú Principal" 
+              titleStyle={styles.headerTitle}
             />
-          </TouchableOpacity>
-          
-          {showRendimientosSubmenu && (
-            <View style={styles.submenuContainer}>
-              <TouchableOpacity 
-                style={styles.submenuItem} 
+            <Appbar.Action 
+              icon="close" 
+              onPress={onClose}
+              iconColor={colors.white}
+            />
+          </Appbar.Header>
+          <Divider />
+          <ScrollView>
+            <List.Accordion
+              title="Rendimientos"
+              titleStyle={styles.accordionTitle}
+              left={props => <List.Icon {...props} icon="trending-up" color={colors.primary} />}
+              expanded={expanded}
+              onPress={() => setExpanded(!expanded)}
+            >
+              <PaperDrawer.Item
+                label="Inicio"
+                icon={() => <MaterialIcons name="home" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Dashboard')}
-              >
-                <MaterialIcons name="home" size={20} color={colors.textSecondary} />
-                <Text style={styles.submenuItemText}>Inicio</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.submenuItem} 
+              />
+              <PaperDrawer.Item
+                label="Equipo"
+                icon={() => <MaterialIcons name="people" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Workers')}
-              >
-                <MaterialIcons name="people" size={20} color={colors.textSecondary} />
-                <Text style={styles.submenuItemText}>Equipo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.submenuItem} 
+              />
+              <PaperDrawer.Item
+                label="Tareas"
+                icon={() => <MaterialIcons name="assignment" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Activities')}
-              >
-                <MaterialIcons name="assignment" size={20} color={colors.textSecondary} />
-                <Text style={styles.submenuItemText}>Tareas</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.submenuItem} 
+              />
+              <PaperDrawer.Item
+                label="Historial"
+                icon={() => <MaterialIcons name="history" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Records')}
-              >
-                <MaterialIcons name="history" size={20} color={colors.textSecondary} />
-                <Text style={styles.submenuItemText}>Historial</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.submenuItem} 
+              />
+              <PaperDrawer.Item
+                label="Estadísticas"
+                icon={() => <MaterialIcons name="bar-chart" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Stats')}
-              >
-                <MaterialIcons name="bar-chart" size={20} color={colors.textSecondary} />
-                <Text style={styles.submenuItemText}>Estadísticas</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.submenuItem} 
+              />
+              <PaperDrawer.Item
+                label="Exportar"
+                icon={() => <MaterialIcons name="file-download" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Export')}
-              >
-                <MaterialIcons name="file-download" size={20} color={colors.textSecondary} />
-                <Text style={styles.submenuItemText}>Exportar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.submenuItem} 
+              />
+              <PaperDrawer.Item
+                label="Metas Semanales"
+                icon={() => <MaterialIcons name="flag" size={24} color={colors.primary} />}
+                onPress={() => navigateTo('WeeklyGoals')}
+              />
+              <PaperDrawer.Item
+                label="Ausencias"
+                icon={() => <MaterialIcons name="event-busy" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Absences')}
-              >
-                <MaterialIcons name="event-busy" size={20} color={colors.textSecondary} />
-                <Text style={styles.submenuItemText}>Ausencias</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </ScrollView>
-      </Animated.View>
-    </>
+              />
+            </List.Accordion>
+          </ScrollView>
+        </View>
+      </Modal>
+    </Portal>
   );
 };
 
@@ -172,80 +105,36 @@ export const MenuButton: React.FC<{ onPress: () => void }> = ({ onPress }) => (
 );
 
 const styles = StyleSheet.create({
-  overlay: {
+  modalContainer: {
     position: 'absolute',
-    top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 1000,
-  },
-  sidebar: {
-    position: 'absolute',
     top: 0,
-    left: 0,
     bottom: 0,
-    width: 280,
-    backgroundColor: colors.surface,
-    zIndex: 1001,
-    shadowColor: colors.black,
+    width: 300,
+    backgroundColor: colors.white,
+    shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 10,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 50,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+  drawerContainer: {
+    flex: 1,
+    backgroundColor: colors.white,
   },
-  title: {
+  header: {
+    backgroundColor: colors.primary,
+    elevation: 4,
+  },
+  headerTitle: {
+    color: colors.white,
     fontSize: 20,
     fontWeight: '700',
+  },
+  accordionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.text,
-  },
-  content: {
-    flex: 1,
-  },
-  menuSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  menuSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  menuSectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  submenuContainer: {
-    backgroundColor: colors.gray[50],
-    paddingLeft: 24,
-  },
-  submenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  submenuItemText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.textSecondary,
   },
   menuButton: {
     padding: 4,

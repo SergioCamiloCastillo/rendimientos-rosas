@@ -3,6 +3,7 @@ import { LogBox } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PaperProvider } from 'react-native-paper';
 import { AppNavigator } from './src/presentation/navigation/AppNavigator';
 import { ToastProvider } from './src/presentation/context/ToastContext';
 
@@ -23,13 +24,15 @@ const queryClient = new QueryClient({
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <ToastProvider>
-          <StatusBar style="dark" />
-          <AppNavigator />
-        </ToastProvider>
-      </SafeAreaProvider>
-    </QueryClientProvider>
+    <PaperProvider>
+      <QueryClientProvider client={queryClient}>
+        <SafeAreaProvider>
+          <ToastProvider>
+            <StatusBar style="dark" />
+            <AppNavigator />
+          </ToastProvider>
+        </SafeAreaProvider>
+      </QueryClientProvider>
+    </PaperProvider>
   );
 }

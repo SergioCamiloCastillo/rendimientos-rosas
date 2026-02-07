@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
-import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker } from '../components';
+import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker, Sidebar, MenuButton } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -383,7 +383,6 @@ export const DashboardScreen: React.FC = () => {
   const selectedActivityData = activities.find(a => a.id === selectedActivity);
 
   const [showMenu, setShowMenu] = useState(false);
-  const [showRendimientosSubmenu, setShowRendimientosSubmenu] = useState(true);
   const navigation = useNavigation();
 
   return (
@@ -544,95 +543,7 @@ export const DashboardScreen: React.FC = () => {
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
-      {/* Sidebar Menu */}
-      {showMenu && (
-        <>
-          <TouchableOpacity 
-            style={styles.sidebarOverlay} 
-            activeOpacity={1}
-            onPress={() => setShowMenu(false)}
-          />
-          <View style={styles.sidebar}>
-            <View style={styles.sidebarHeader}>
-              <Text style={styles.sidebarTitle}>Menú</Text>
-              <TouchableOpacity onPress={() => setShowMenu(false)}>
-                <MaterialIcons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.sidebarContent}>
-              {/* Sección Rendimientos con submenús */}
-              <TouchableOpacity 
-                style={styles.menuSection} 
-                onPress={() => setShowRendimientosSubmenu(!showRendimientosSubmenu)}
-              >
-                <View style={styles.menuSectionHeader}>
-                  <MaterialIcons name="trending-up" size={24} color={colors.primary} />
-                  <Text style={styles.menuSectionTitle}>Rendimientos</Text>
-                </View>
-                <MaterialIcons 
-                  name={showRendimientosSubmenu ? "expand-less" : "expand-more"} 
-                  size={24} 
-                  color={colors.textSecondary} 
-                />
-              </TouchableOpacity>
-              
-              {showRendimientosSubmenu && (
-                <View style={styles.submenuContainer}>
-                  <TouchableOpacity 
-                    style={styles.submenuItem} 
-                    onPress={() => { setShowMenu(false); navigation.navigate('Dashboard' as never); }}
-                  >
-                    <MaterialIcons name="home" size={20} color={colors.textSecondary} />
-                    <Text style={styles.submenuItemText}>Inicio</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.submenuItem} 
-                    onPress={() => { setShowMenu(false); navigation.navigate('Workers' as never); }}
-                  >
-                    <MaterialIcons name="people" size={20} color={colors.textSecondary} />
-                    <Text style={styles.submenuItemText}>Equipo</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.submenuItem} 
-                    onPress={() => { setShowMenu(false); navigation.navigate('Activities' as never); }}
-                  >
-                    <MaterialIcons name="assignment" size={20} color={colors.textSecondary} />
-                    <Text style={styles.submenuItemText}>Tareas</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.submenuItem} 
-                    onPress={() => { setShowMenu(false); navigation.navigate('Records' as never); }}
-                  >
-                    <MaterialIcons name="history" size={20} color={colors.textSecondary} />
-                    <Text style={styles.submenuItemText}>Historial</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.submenuItem} 
-                    onPress={() => { setShowMenu(false); navigation.navigate('Stats' as never); }}
-                  >
-                    <MaterialIcons name="bar-chart" size={20} color={colors.textSecondary} />
-                    <Text style={styles.submenuItemText}>Estadísticas</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.submenuItem} 
-                    onPress={() => { setShowMenu(false); navigation.navigate('Export' as never); }}
-                  >
-                    <MaterialIcons name="file-download" size={20} color={colors.textSecondary} />
-                    <Text style={styles.submenuItemText}>Exportar</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.submenuItem} 
-                    onPress={() => { setShowMenu(false); navigation.navigate('Absences' as never); }}
-                  >
-                    <MaterialIcons name="event-busy" size={20} color={colors.textSecondary} />
-                    <Text style={styles.submenuItemText}>Ausencias</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </>
-      )}
+      <Sidebar visible={showMenu} onClose={() => setShowMenu(false)} />
 
       <BottomSheet visible={showAddRecord} onClose={() => { resetForm(); setShowAddRecord(false); }}>
         <Text style={styles.sheetTitle}>Nuevo Registro</Text>

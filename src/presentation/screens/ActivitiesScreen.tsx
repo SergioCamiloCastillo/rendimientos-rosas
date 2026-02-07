@@ -323,7 +323,7 @@ export const ActivitiesScreen: React.FC = () => {
         />
 
         <Input
-          label="Meta de rendimiento"
+          label="Meta de rendimiento (por hora)"
           value={expectedPerformance}
           onChangeText={(value) => setExpectedPerformance(value.replace(',', '.'))}
           keyboardType="decimal-pad"
@@ -367,7 +367,7 @@ export const ActivitiesScreen: React.FC = () => {
         />
 
         <Input
-          label="Meta de rendimiento"
+          label="Meta de rendimiento (por hora)"
           placeholder="Ej: 200"
           value={expectedPerformance}
           onChangeText={(value) => setExpectedPerformance(value.replace(',', '.'))}
