@@ -9,12 +9,16 @@ interface PerformanceCardProps {
   record: PerformanceRecordWithDetails;
   onPress?: () => void;
   onDelete?: () => void;
+  showUnitsInBadge?: boolean;
+  activityDayTotal?: number;
 }
 
 export const PerformanceCard: React.FC<PerformanceCardProps> = ({
   record,
   onPress,
   onDelete,
+  showUnitsInBadge = false,
+  activityDayTotal,
 }) => {
   // Calcular meta total basada en horas trabajadas
   const totalHoursRaw = record.totalHours || 0;
@@ -65,20 +69,40 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
           </Text>
           <Text style={styles.activityName}>{record.activityName}</Text>
         </View>
-        <View
-          style={[
-            styles.statusBadge,
-            metGoal ? styles.successBadge : styles.dangerBadge,
-          ]}
-        >
-          <Text
+        <View style={styles.rightHeader}>
+          {activityDayTotal !== undefined && (
+            <View style={styles.dayTotalBadge}>
+              <Text style={styles.dayTotalLabel}>Día</Text>
+              <Text style={styles.dayTotalValue}>
+                {activityDayTotal} {record.activityUnit}
+              </Text>
+            </View>
+          )}
+          <View
             style={[
-              styles.statusText,
-              metGoal ? styles.successText : styles.dangerText,
+              styles.statusBadge,
+              metGoal ? styles.successBadge : styles.dangerBadge,
             ]}
           >
-            {percentage}%
-          </Text>
+            {showUnitsInBadge && (
+              <Text
+                style={[
+                  styles.unitsText,
+                  metGoal ? styles.successText : styles.dangerText,
+                ]}
+              >
+                {record.achievedPerformance} {record.activityUnit}
+              </Text>
+            )}
+            <Text
+              style={[
+                styles.statusText,
+                metGoal ? styles.successText : styles.dangerText,
+              ]}
+            >
+              {percentage}%
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -160,6 +184,29 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
+  rightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dayTotalBadge: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  dayTotalLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.primary,
+    textTransform: 'uppercase',
+  },
+  dayTotalValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
   workerName: {
     fontSize: 16,
     fontWeight: '700',
@@ -187,6 +234,11 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  unitsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 2,
   },
   successText: {
     color: colors.success,
@@ -250,6 +302,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.text,
+    textAlign: 'center',
   },
   notesContainer: {
     marginTop: 12,

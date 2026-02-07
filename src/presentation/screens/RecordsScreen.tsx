@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
-import { PerformanceCard, BottomSheet, Select, Button, EmptyState } from '../components';
+import { PerformanceCard, BottomSheet, Select, Button, EmptyState, Sidebar, MenuButton } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
 import { exportToExcel, exportByActivity, exportByWorker } from '../../utils/excelExport';
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
@@ -21,6 +21,7 @@ type FilterPeriod = 'today' | 'week' | 'month' | 'all';
 
 export const RecordsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const [showMenu, setShowMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showExportOptions, setShowExportOptions] = useState(false);
@@ -35,6 +36,7 @@ export const RecordsScreen: React.FC = () => {
   const { 
     records, 
     stats,
+    filters,
     fetchRecords, 
     fetchStats,
     setFilters,
@@ -131,6 +133,7 @@ export const RecordsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <MenuButton onPress={() => setShowMenu(true)} />
         <Text style={styles.title}>Historial</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
@@ -147,6 +150,8 @@ export const RecordsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       </View>
+
+      <Sidebar visible={showMenu} onClose={() => setShowMenu(false)} />
 
       <View style={styles.statsContainer}>
         <View style={styles.statsRow}>
@@ -170,12 +175,25 @@ export const RecordsScreen: React.FC = () => {
             <Text style={styles.statLabel}>ÉXITO</Text>
           </View>
         </View>
-        {records.some(r => r.totalHours && r.totalHours > 0) && (
+        {(records.some(r => r.totalHours && r.totalHours > 0) || filters.activityId) && (
           <View style={styles.hoursInfo}>
-            <MaterialIcons name="schedule" size={16} color={colors.primary} />
-            <Text style={styles.hoursText}>
-              {records.reduce((sum, r) => sum + (r.totalHours || 0), 0).toFixed(1)}h totales trabajadas
-            </Text>
+            {records.some(r => r.totalHours && r.totalHours > 0) && (
+              <>
+                <MaterialIcons name="schedule" size={16} color={colors.primary} />
+                <Text style={styles.hoursText}>
+                  {records.reduce((sum, r) => sum + (r.totalHours || 0), 0).toFixed(1)}h
+                </Text>
+              </>
+            )}
+            {filters.activityId && records.length > 0 && (
+              <>
+                {records.some(r => r.totalHours && r.totalHours > 0) && <Text style={styles.separator}>  •  </Text>}
+                <MaterialIcons name="check-circle" size={16} color={colors.success} />
+                <Text style={styles.unitsText}>
+                  {records.reduce((sum, r) => sum + r.achievedPerformance, 0)} {records[0]?.activityUnit}
+                </Text>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -196,6 +214,7 @@ export const RecordsScreen: React.FC = () => {
           <PerformanceCard
             record={item}
             onDelete={() => handleDeleteRecord(item.id)}
+            showUnitsInBadge={!!filterActivity}
           />
         )}
         contentContainerStyle={styles.list}
@@ -396,6 +415,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
     fontWeight: '600',
+    textAlign: 'center',
   },
   statDivider: {
     width: 1,
@@ -415,6 +435,22 @@ const styles = StyleSheet.create({
   hoursText: {
     fontSize: 13,
     color: colors.primary,
+    fontWeight: '600',
+  },
+  separator: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  unitsInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  unitsText: {
+    fontSize: 13,
+    color: colors.success,
     fontWeight: '600',
   },
   activeFilters: {

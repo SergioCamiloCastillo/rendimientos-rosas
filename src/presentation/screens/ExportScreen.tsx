@@ -18,9 +18,10 @@ import { useToast } from '../context/ToastContext';
 import { PerformanceRepository } from '../../data/repositories';
 import { format, startOfWeek, endOfWeek, subWeeks, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Button, Select } from '../components';
+import { Button, Select, Sidebar, MenuButton } from '../components';
 
 export const ExportScreen: React.FC = () => {
+  const [showMenu, setShowMenu] = useState(false);
   const { showToast } = useToast();
   const { workers, fetchWorkers } = useWorkerStore();
   const { activities, fetchActivities } = useActivityStore();
@@ -119,6 +120,14 @@ export const ExportScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topHeader}>
+        <MenuButton onPress={() => setShowMenu(true)} />
+        <Text style={styles.topTitle}>Exportar</Text>
+        <View style={{ width: 32 }} />
+      </View>
+
+      <Sidebar visible={showMenu} onClose={() => setShowMenu(false)} />
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>Exporta tus datos a Excel</Text>
@@ -385,6 +394,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  topTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
   },
   filterSection: {
     paddingHorizontal: 20,

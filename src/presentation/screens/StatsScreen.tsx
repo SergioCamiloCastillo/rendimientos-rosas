@@ -15,7 +15,7 @@ import Svg, { Line, Circle } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme';
-import { Select } from '../components';
+import { Select, Sidebar, MenuButton } from '../components';
 import { PerformanceRepository, WorkerRepository } from '../../data/repositories';
 import { PerformanceRecordWithDetails, Worker } from '../../domain/entities';
 import { format, startOfWeek, endOfWeek, subWeeks, parseISO } from 'date-fns';
@@ -42,6 +42,7 @@ interface DailyStats {
 }
 
 export const StatsScreen: React.FC = () => {
+  const [showMenu, setShowMenu] = useState(false);
   const [startDate, setStartDate] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [endDate, setEndDate] = useState(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -225,6 +226,14 @@ export const StatsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topHeader}>
+        <MenuButton onPress={() => setShowMenu(true)} />
+        <Text style={styles.topTitle}>Estadísticas</Text>
+        <View style={{ width: 32 }} />
+      </View>
+
+      <Sidebar visible={showMenu} onClose={() => setShowMenu(false)} />
+
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>Estadísticas</Text>
@@ -646,6 +655,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  topTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
   },
   header: {
     paddingHorizontal: 20,

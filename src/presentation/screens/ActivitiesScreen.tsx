@@ -10,12 +10,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
-import { Button, Input, BottomSheet, ListItem, EmptyState } from '../components';
+import { Button, Input, BottomSheet, ListItem, EmptyState, Sidebar, MenuButton } from '../components';
 import { useActivityStore } from '../../store';
 import { Activity } from '../../domain/entities';
 import { useToast } from '../context/ToastContext';
 
 export const ActivitiesScreen: React.FC = () => {
+  const [showMenu, setShowMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [showEditActivity, setShowEditActivity] = useState(false);
@@ -227,8 +228,12 @@ export const ActivitiesScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <MenuButton onPress={() => setShowMenu(true)} />
         <Text style={styles.title}>Actividades</Text>
+        <View style={{ width: 32 }} />
       </View>
+
+      <Sidebar visible={showMenu} onClose={() => setShowMenu(false)} />
 
       <View style={styles.tabs}>
         <TouchableOpacity
@@ -319,7 +324,6 @@ export const ActivitiesScreen: React.FC = () => {
 
         <Input
           label="Meta de rendimiento"
-          placeholder="Ej: 200"
           value={expectedPerformance}
           onChangeText={setExpectedPerformance}
           keyboardType="numeric"
@@ -350,7 +354,6 @@ export const ActivitiesScreen: React.FC = () => {
 
         <Input
           label="Descripción (opcional)"
-          placeholder="Ej: Corte de tallos de rosa para exportación"
           value={description}
           onChangeText={setDescription}
           multiline={true}

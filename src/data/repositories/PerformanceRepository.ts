@@ -26,6 +26,8 @@ export class PerformanceRepository {
 
   static async recalculateAllMetGoals(): Promise<void> {
     const records = await this.getAll();
+    const activities = await ActivityRepository.getAll();
+    const today = new Date().toISOString().split('T')[0];
     let updated = false;
 
     for (let i = 0; i < records.length; i++) {
@@ -43,17 +45,27 @@ export class PerformanceRepository {
         }, 0);
       }
       
+      // Si es hoy, actualizar expectedPerformance con el valor actual de la actividad
+      let expectedPerformance = record.expectedPerformance;
+      if (record.date === today && !record.isDeleted) {
+        const activity = activities.find(a => a.id === record.activityId);
+        if (activity && activity.expectedPerformance !== record.expectedPerformance) {
+          expectedPerformance = activity.expectedPerformance;
+        }
+      }
+      
       // Calcular metGoal correctamente basado en horas
       const expectedTotal = totalHours > 0 
-        ? record.expectedPerformance * totalHours 
-        : record.expectedPerformance;
+        ? expectedPerformance * totalHours 
+        : expectedPerformance;
       
       const correctMetGoal = record.achievedPerformance >= expectedTotal;
       
-      // Actualizar si metGoal es diferente o totalHours cambió
-      if (record.metGoal !== correctMetGoal || record.totalHours !== totalHours) {
+      // Actualizar si algo cambió
+      if (record.metGoal !== correctMetGoal || record.totalHours !== totalHours || record.expectedPerformance !== expectedPerformance) {
         records[i] = {
           ...record,
+          expectedPerformance,
           totalHours,
           metGoal: correctMetGoal,
           updatedAt: new Date().toISOString(),
@@ -105,6 +117,7 @@ export class PerformanceRepository {
         ...existing,
         shifts: newShifts,
         achievedPerformance: totalAchieved,
+        expectedPerformance: input.expectedPerformance,
         totalHours,
         metGoal,
         updatedAt: now,
@@ -244,7 +257,11 @@ export class PerformanceRepository {
   }
 
   static async getTodayRecords(): Promise<PerformanceRecordWithDetails[]> {
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const today = `${year}-${month}-${day}`;
     return this.getWithDetails({ startDate: today, endDate: today });
   }
 

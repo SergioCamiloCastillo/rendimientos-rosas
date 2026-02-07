@@ -10,12 +10,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
-import { Button, Input, BottomSheet, ListItem, EmptyState } from '../components';
+import { Button, Input, BottomSheet, ListItem, EmptyState, Sidebar, MenuButton } from '../components';
 import { useWorkerStore } from '../../store';
 import { Worker } from '../../domain/entities';
 import { useToast } from '../context/ToastContext';
 
 export const WorkersScreen: React.FC = () => {
+  const [showMenu, setShowMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddWorker, setShowAddWorker] = useState(false);
   const [showEditWorker, setShowEditWorker] = useState(false);
@@ -207,9 +208,12 @@ export const WorkersScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <MenuButton onPress={() => setShowMenu(true)} />
         <Text style={styles.title}>Trabajadores</Text>
-       
+        <View style={{ width: 32 }} />
       </View>
+
+      <Sidebar visible={showMenu} onClose={() => setShowMenu(false)} />
 
       <View style={styles.tabs}>
         <TouchableOpacity
@@ -318,14 +322,12 @@ export const WorkersScreen: React.FC = () => {
 
         <Input
           label="Nombre completo"
-          placeholder="Ej: María García"
           value={name}
           onChangeText={setName}
         />
 
         <Input
           label="Cargo (opcional)"
-          placeholder="Ej: Operaria"
           value={position}
           onChangeText={setPosition}
         />

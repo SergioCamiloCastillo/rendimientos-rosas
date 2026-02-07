@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
 import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
@@ -21,9 +21,9 @@ import { es } from 'date-fns/locale';
 import { useToast } from '../context/ToastContext';
 
 const { width } = Dimensions.get('window');
-const HEADER_MAX_HEIGHT = 290;
-const HEADER_MIN_HEIGHT = 90;
-const HEADER_SCROLL_DISTANCE = HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT;
+const HEADER_BASE_HEIGHT = 290;
+const HEADER_ACTIVITY_ROW_HEIGHT = 24;
+const HEADER_MIN_HEIGHT = 60;
 
 export const DashboardScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
@@ -58,26 +58,38 @@ export const DashboardScreen: React.FC = () => {
     isLoading 
   } = usePerformanceStore();
 
+  // Calcular número de actividades únicas del día
+  const uniqueActivitiesCount = useMemo(() => {
+    const uniqueActivities = new Set(selectedDateRecords.map(r => r.activityId));
+    return Math.max(uniqueActivities.size, 1);
+  }, [selectedDateRecords]);
+
+  // Altura dinámica del header basada en número de actividades
+  const headerMaxHeight = HEADER_BASE_HEIGHT + (uniqueActivitiesCount * HEADER_ACTIVITY_ROW_HEIGHT);
+  const headerScrollDistance = headerMaxHeight - HEADER_MIN_HEIGHT;
+
   const headerHeight = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
-    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+    inputRange: [0, headerScrollDistance],
+    outputRange: [headerMaxHeight, HEADER_MIN_HEIGHT],
     extrapolate: 'clamp',
   });
 
+  // El header expandido se oculta rápidamente al hacer scroll
   const headerOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
-    outputRange: [1, 0.5, 0],
+    inputRange: [0, 50],
+    outputRange: [1, 0],
     extrapolate: 'clamp',
   });
 
+  // El mini header aparece cuando el expandido se oculta
   const miniHeaderOpacity = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE / 2, HEADER_SCROLL_DISTANCE],
-    outputRange: [0, 0.5, 1],
+    inputRange: [0, 50],
+    outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
   const statsScale = scrollY.interpolate({
-    inputRange: [0, HEADER_SCROLL_DISTANCE],
+    inputRange: [0, headerScrollDistance],
     outputRange: [1, 0.8],
     extrapolate: 'clamp',
   });
@@ -198,6 +210,17 @@ export const DashboardScreen: React.FC = () => {
       }
     }
 
+    // Determinar el expectedPerformance a usar:
+    // - Si es HOY: usar siempre la meta actual de la actividad
+    // - Si es otro día: mantener la meta del registro existente
+    const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+    const existingRecordWithActivity = selectedDateRecords.find(
+      r => r.activityId === selectedActivity && !r.isDeleted
+    );
+    const expectedPerformanceToUse = isToday 
+      ? activity.expectedPerformance 
+      : (existingRecordWithActivity?.expectedPerformance || activity.expectedPerformance);
+
     const shift = {
       startTime,
       endTime,
@@ -210,7 +233,7 @@ export const DashboardScreen: React.FC = () => {
         activityId: selectedActivity,
         date: format(selectedDate, 'yyyy-MM-dd'),
         achievedPerformance: parseFloat(achievedPerformance),
-        expectedPerformance: activity.expectedPerformance,
+        expectedPerformance: expectedPerformanceToUse,
         shifts: [shift],
         totalHours: hours,
         notes: notes || undefined,
@@ -303,15 +326,19 @@ export const DashboardScreen: React.FC = () => {
       return;
     }
 
-    // Calcular totales
-    const totalAchieved = editingShifts.reduce((sum, s) => sum + parseFloat(s.achievedPerformance), 0);
-    const totalHours = editingShifts.reduce((sum, s) => {
+    // Convertir achievedPerformance a números y calcular totales
+    const shiftsWithNumbers = editingShifts.map(s => ({
+      ...s,
+      achievedPerformance: parseFloat(s.achievedPerformance.toString()) || 0,
+    }));
+    const totalAchieved = shiftsWithNumbers.reduce((sum, s) => sum + s.achievedPerformance, 0);
+    const totalHours = shiftsWithNumbers.reduce((sum, s) => {
       return sum + calculateHours(s.startTime, s.endTime);
     }, 0);
 
     try {
       await updateRecord(editingRecord.id, {
-        shifts: editingShifts,
+        shifts: shiftsWithNumbers,
         achievedPerformance: totalAchieved,
         totalHours,
         notes: notes || undefined,
@@ -349,12 +376,51 @@ export const DashboardScreen: React.FC = () => {
 
   const selectedActivityData = activities.find(a => a.id === selectedActivity);
 
+  const [showMenu, setShowMenu] = useState(false);
+  const [showRendimientosSubmenu, setShowRendimientosSubmenu] = useState(true);
+  const navigation = useNavigation();
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header Sticky Animado */}
-      <Animated.View style={[styles.stickyHeader, { height: headerHeight }]}>
-        {/* Header Expandido - Estilo Original */}
-        <Animated.View style={[styles.expandedHeader, { opacity: headerOpacity }]}>
+      {/* Mini Header Fijo */}
+      <View style={styles.fixedMiniHeader}>
+        <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.menuButton}>
+          <MaterialIcons name="menu" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.miniTitle}>Rendimientos</Text>
+        <View style={styles.miniStats}>
+          <View style={styles.miniStatItem}>
+            <Text style={styles.miniStatValue}>{stats.total}</Text>
+            <Text style={styles.miniStatLabel}>Total</Text>
+          </View>
+          <View style={styles.miniStatDivider} />
+          <View style={styles.miniStatItem}>
+            <Text style={[styles.miniStatValue, { color: colors.success }]}>{stats.metGoal}</Text>
+            <Text style={styles.miniStatLabel}>✓</Text>
+          </View>
+          <View style={styles.miniStatDivider} />
+          <View style={styles.miniStatItem}>
+            <Text style={[styles.miniStatValue, { color: colors.danger }]}>{stats.notMetGoal}</Text>
+            <Text style={styles.miniStatLabel}>✗</Text>
+          </View>
+          <View style={styles.miniStatDivider} />
+          <View style={styles.miniStatItem}>
+            <Text style={[styles.miniStatValue, { color: colors.primary }]}>{stats.percentage}%</Text>
+            <Text style={styles.miniStatLabel}>Meta</Text>
+          </View>
+        </View>
+      </View>
+
+      <ScrollView
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing === true} 
+            onRefresh={onRefresh}
+          />
+        }
+      >
+        {/* Header Expandido */}
+        <View style={styles.expandedHeader}>
           <View style={styles.headerTop}>
             <View style={styles.dateSelector}>
               <TouchableOpacity 
@@ -400,57 +466,34 @@ export const DashboardScreen: React.FC = () => {
             </View>
           </View>
 
-          <View style={styles.percentageCard}>
-            <Text style={styles.percentageLabel}>Porcentaje de cumplimiento</Text>
-            <Text style={styles.percentageValue}>{stats.percentage}%</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${stats.percentage}%` }]} />
+          <View style={styles.bottomStatsRow}>
+            <View style={styles.percentageCard}>
+              <Text style={styles.percentageLabel}>Porcentaje de cumplimiento</Text>
+              <Text style={styles.percentageValue}>{stats.percentage}%</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${stats.percentage}%` }]} />
+              </View>
+            </View>
+            <View style={styles.totalUnitsCard}>
+              <Text style={styles.percentageLabel}>Total del día</Text>
+              <View style={styles.activityTotalsList}>
+                {Object.entries(
+                  selectedDateRecords.reduce((acc, r) => {
+                    const key = r.activityName;
+                    if (!acc[key]) acc[key] = { total: 0, unit: r.activityUnit };
+                    acc[key].total += r.achievedPerformance;
+                    return acc;
+                  }, {} as Record<string, { total: number; unit: string }>)
+                ).map(([activity, data]) => (
+                  <View key={activity} style={styles.activityTotalRow}>
+                    <Text style={styles.activityTotalName} numberOfLines={1}>{activity}</Text>
+                    <Text style={styles.activityTotalValue}>{data.total} {data.unit}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
-        </Animated.View>
-
-        {/* Mini Header (visible al hacer scroll) */}
-        <Animated.View style={[styles.miniHeader, { opacity: miniHeaderOpacity }]} pointerEvents="none">
-          <Text style={styles.miniTitle}>Rendimientos</Text>
-          <View style={styles.miniStats}>
-            <View style={styles.miniStatItem}>
-              <Text style={styles.miniStatValue}>{stats.total}</Text>
-              <Text style={styles.miniStatLabel}>Total</Text>
-            </View>
-            <View style={styles.miniStatDivider} />
-            <View style={styles.miniStatItem}>
-              <Text style={[styles.miniStatValue, { color: colors.success }]}>{stats.metGoal}</Text>
-              <Text style={styles.miniStatLabel}>✓</Text>
-            </View>
-            <View style={styles.miniStatDivider} />
-            <View style={styles.miniStatItem}>
-              <Text style={[styles.miniStatValue, { color: colors.danger }]}>{stats.notMetGoal}</Text>
-              <Text style={styles.miniStatLabel}>✗</Text>
-            </View>
-            <View style={styles.miniStatDivider} />
-            <View style={styles.miniStatItem}>
-              <Text style={[styles.miniStatValue, { color: colors.primary }]}>{stats.percentage}%</Text>
-              <Text style={styles.miniStatLabel}>Meta</Text>
-            </View>
-          </View>
-        </Animated.View>
-      </Animated.View>
-
-      <Animated.ScrollView
-        contentContainerStyle={{ paddingTop: HEADER_MAX_HEIGHT }}
-        scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: false }
-        )}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing === true} 
-            onRefresh={onRefresh}
-            progressViewOffset={HEADER_MAX_HEIGHT}
-          />
-        }
-      >
+        </View>
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
@@ -486,7 +529,7 @@ export const DashboardScreen: React.FC = () => {
               ))
           )}
         </View>
-      </Animated.ScrollView>
+      </ScrollView>
 
       <TouchableOpacity
         style={styles.fab}
@@ -495,8 +538,101 @@ export const DashboardScreen: React.FC = () => {
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
+      {/* Sidebar Menu */}
+      {showMenu && (
+        <>
+          <TouchableOpacity 
+            style={styles.sidebarOverlay} 
+            activeOpacity={1}
+            onPress={() => setShowMenu(false)}
+          />
+          <View style={styles.sidebar}>
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.sidebarTitle}>Menú</Text>
+              <TouchableOpacity onPress={() => setShowMenu(false)}>
+                <MaterialIcons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.sidebarContent}>
+              {/* Sección Rendimientos con submenús */}
+              <TouchableOpacity 
+                style={styles.menuSection} 
+                onPress={() => setShowRendimientosSubmenu(!showRendimientosSubmenu)}
+              >
+                <View style={styles.menuSectionHeader}>
+                  <MaterialIcons name="trending-up" size={24} color={colors.primary} />
+                  <Text style={styles.menuSectionTitle}>Rendimientos</Text>
+                </View>
+                <MaterialIcons 
+                  name={showRendimientosSubmenu ? "expand-less" : "expand-more"} 
+                  size={24} 
+                  color={colors.textSecondary} 
+                />
+              </TouchableOpacity>
+              
+              {showRendimientosSubmenu && (
+                <View style={styles.submenuContainer}>
+                  <TouchableOpacity 
+                    style={styles.submenuItem} 
+                    onPress={() => { setShowMenu(false); navigation.navigate('Dashboard' as never); }}
+                  >
+                    <MaterialIcons name="home" size={20} color={colors.textSecondary} />
+                    <Text style={styles.submenuItemText}>Inicio</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.submenuItem} 
+                    onPress={() => { setShowMenu(false); navigation.navigate('Workers' as never); }}
+                  >
+                    <MaterialIcons name="people" size={20} color={colors.textSecondary} />
+                    <Text style={styles.submenuItemText}>Equipo</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.submenuItem} 
+                    onPress={() => { setShowMenu(false); navigation.navigate('Activities' as never); }}
+                  >
+                    <MaterialIcons name="assignment" size={20} color={colors.textSecondary} />
+                    <Text style={styles.submenuItemText}>Tareas</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.submenuItem} 
+                    onPress={() => { setShowMenu(false); navigation.navigate('Records' as never); }}
+                  >
+                    <MaterialIcons name="history" size={20} color={colors.textSecondary} />
+                    <Text style={styles.submenuItemText}>Historial</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.submenuItem} 
+                    onPress={() => { setShowMenu(false); navigation.navigate('Stats' as never); }}
+                  >
+                    <MaterialIcons name="bar-chart" size={20} color={colors.textSecondary} />
+                    <Text style={styles.submenuItemText}>Estadísticas</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.submenuItem} 
+                    onPress={() => { setShowMenu(false); navigation.navigate('Export' as never); }}
+                  >
+                    <MaterialIcons name="file-download" size={20} color={colors.textSecondary} />
+                    <Text style={styles.submenuItemText}>Exportar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.submenuItem} 
+                    onPress={() => { setShowMenu(false); navigation.navigate('Absences' as never); }}
+                  >
+                    <MaterialIcons name="event-busy" size={20} color={colors.textSecondary} />
+                    <Text style={styles.submenuItemText}>Ausencias</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </>
+      )}
+
       <BottomSheet visible={showAddRecord} onClose={() => setShowAddRecord(false)}>
         <Text style={styles.sheetTitle}>Nuevo Registro</Text>
+        <Text style={styles.sheetDate}>
+          {format(selectedDate, "EEEE, d 'de' MMMM yyyy", { locale: es })}
+        </Text>
         
         <Select
           label="Trabajador"
@@ -555,9 +691,9 @@ export const DashboardScreen: React.FC = () => {
         <Input
           label="Rendimiento Logrado"
           placeholder="Ej: 150"
-          keyboardType="numeric"
+          keyboardType="decimal-pad"
           value={achievedPerformance}
-          onChangeText={setAchievedPerformance}
+          onChangeText={(value) => setAchievedPerformance(value.replace(',', '.'))}
         />
 
         <Input
@@ -639,9 +775,9 @@ export const DashboardScreen: React.FC = () => {
                 <Input
                   label="Rendimiento Logrado"
                   placeholder="Ej: 340"
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                   value={shift.achievedPerformance.toString()}
-                  onChangeText={(value) => handleUpdateShift(index, 'achievedPerformance', parseFloat(value) || 0)}
+                  onChangeText={(value) => handleUpdateShift(index, 'achievedPerformance', value.replace(',', '.'))}
                 />
               </View>
             </View>
@@ -662,6 +798,19 @@ export const DashboardScreen: React.FC = () => {
           onPress={handleUpdateRecord}
           loading={isLoading}
         />
+
+        <TouchableOpacity
+          style={styles.deleteRecordBtn}
+          onPress={() => {
+            if (editingRecord) {
+              setShowEditRecord(false);
+              handleDeleteRecord(editingRecord.id);
+            }
+          }}
+        >
+          <MaterialIcons name="delete" size={20} color={colors.danger} />
+          <Text style={styles.deleteRecordText}>Eliminar registro</Text>
+        </TouchableOpacity>
       </BottomSheet>
 
     </SafeAreaView>
@@ -673,25 +822,117 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  stickyHeader: {
+  fixedMiniHeader: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  menuButton: {
+    padding: 4,
+  },
+  menuList: {
+    marginTop: 8,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 16,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  menuSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  menuSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  menuSectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  submenuContainer: {
+    backgroundColor: colors.gray[50],
+    paddingLeft: 24,
+  },
+  submenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  submenuItemText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.textSecondary,
+  },
+  sidebarOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.surface,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     zIndex: 1000,
-    overflow: 'hidden',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+  },
+  sidebar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: 280,
+    backgroundColor: colors.surface,
+    zIndex: 1001,
     shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sidebarHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    paddingTop: 50,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sidebarTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  sidebarContent: {
+    flex: 1,
   },
   expandedHeader: {
+    backgroundColor: colors.surface,
     padding: 20,
-    paddingTop: 45,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    marginBottom: 8,
   },
   headerTop: {
     marginBottom: 12,
@@ -769,11 +1010,11 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
     borderRadius: 12,
-    padding: 12,
+    padding: 8,
     alignItems: 'center',
   },
   statCardValue: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
   },
   statCardLabel: {
@@ -781,15 +1022,54 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
+  bottomStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
   percentageCard: {
+    flex: 1,
     backgroundColor: colors.background,
     borderRadius: 12,
     padding: 14,
+  },
+  totalUnitsCard: {
+    flex: 3,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    padding: 14,
+  },
+  totalUnitsLabel: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  activityTotalsList: {
+    marginTop: 4,
+    paddingBottom: 8,
+  },
+  activityTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  activityTotalName: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    flex: 1,
+    marginRight: 8,
+  },
+  activityTotalValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
   },
   percentageLabel: {
     fontSize: 12,
     color: colors.textSecondary,
     marginBottom: 4,
+    fontWeight: '700',
   },
   percentageValue: {
     fontSize: 28,
@@ -934,8 +1214,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 24,
+    marginBottom: 8,
     textAlign: 'center',
+  },
+  sheetDate: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 20,
+    textAlign: 'center',
+    textTransform: 'capitalize',
   },
   metaInfo: {
     backgroundColor: colors.primaryLight,
@@ -1078,5 +1365,18 @@ const styles = StyleSheet.create({
   },
   editShiftTimeField: {
     flex: 1,
+  },
+  deleteRecordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 12,
+  },
+  deleteRecordText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.danger,
   },
 });
