@@ -1,13 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Modal,
   StyleSheet,
   TouchableOpacity,
-  TouchableWithoutFeedback,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
+  Keyboard,
+  Platform,
 } from 'react-native';
 import { colors } from '../theme';
 
@@ -22,6 +21,36 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   onClose,
   children,
 }) => {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showListener = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    });
+
+    const hideListener = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardHeight(0);
+    }
+  }, [visible]);
+
   return (
     <Modal
       visible={visible === true}
@@ -33,23 +62,23 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         <TouchableOpacity 
           style={styles.backdrop} 
           activeOpacity={1} 
-          onPress={onClose}
+          onPress={() => { Keyboard.dismiss(); onClose(); }}
         />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          <View style={styles.container}>
-            <View style={styles.handle} />
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.scrollContent}
-            >
-              {children}
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+        <View style={[
+          styles.container,
+          keyboardHeight > 0 && { marginBottom: keyboardHeight }
+        ]}>
+          <View style={styles.handle} />
+          <ScrollView
+            ref={scrollViewRef}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+            bounces={false}
+          >
+            {children}
+          </ScrollView>
+        </View>
       </View>
     </Modal>
   );
@@ -58,15 +87,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
+    justifyContent: 'flex-end',
     backgroundColor: 'transparent',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  keyboardView: {
-    justifyContent: 'flex-end',
-    flex: 1,
   },
   container: {
     backgroundColor: colors.surface,
@@ -74,8 +100,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingBottom: 40,
-    minHeight: 350,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   scrollContent: {
     paddingBottom: 20,

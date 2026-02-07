@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Modal, Keyboard, Platform } from 'react-native';
 import { colors } from '../theme';
 
 interface TimePickerProps {
@@ -19,17 +19,34 @@ export const TimePicker: React.FC<TimePickerProps> = ({
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
   const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const hoursInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (showModal) {
-      // Pequeño delay para asegurar que el modal esté visible
       const timer = setTimeout(() => {
         hoursInputRef.current?.focus();
       }, 100);
       return () => clearTimeout(timer);
     }
   }, [showModal]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showListener = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideListener = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
 
   // Formatear para mostrar en formato 12h AM/PM
   const formatTimeDisplay = (timeStr: string): string => {
@@ -116,7 +133,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
         onRequestClose={handleCancel}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, keyboardHeight > 0 && { marginBottom: keyboardHeight }]}>
             <View style={styles.modalHeader}>
               <TouchableOpacity onPress={handleCancel}>
                 <Text style={styles.modalButton}>Cancelar</Text>

@@ -197,7 +197,7 @@ export const WeeklyGoalsScreen: React.FC = () => {
         />
 
         <Input
-          label="Meta semanal"
+          label={`Meta semanal${selectedActivity ? ` (${activities.find(a => a.id === selectedActivity)?.unit || ''})` : ''}`}
           value={goalAmount}
           onChangeText={(value) => setGoalAmount(value.replace(',', '.'))}
           keyboardType="decimal-pad"
