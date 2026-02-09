@@ -13,7 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme';
 import { usePerformanceStore, useWorkerStore, useActivityStore } from '../../store';
-import { exportToExcel, exportByActivity, exportByWorker, exportWeeklyReport } from '../../utils/excelExport';
+import { exportToExcel, exportByActivity, exportByWorker, exportWeeklyReport, exportWorkPlan } from '../../utils/excelExport';
 import { useToast } from '../context/ToastContext';
 import { PerformanceRepository } from '../../data/repositories';
 import { format, startOfWeek, endOfWeek, subWeeks, differenceInDays } from 'date-fns';
@@ -87,6 +87,19 @@ export const ExportScreen: React.FC = () => {
     } catch (error) {
       console.log('Export error:', error);
       showToast('No se pudo exportar los datos', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportWorkPlan = async () => {
+    setExporting(true);
+    try {
+      await exportWorkPlan(format(startDate, 'yyyy-MM-dd'));
+      showToast('Plan de trabajo exportado', 'success');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'No se pudo exportar';
+      showToast(msg, 'error');
     } finally {
       setExporting(false);
     }
@@ -228,6 +241,23 @@ export const ExportScreen: React.FC = () => {
               <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
           )}
+
+          {/* Reporte Plan de Trabajo */}
+          <TouchableOpacity 
+            style={styles.exportOption}
+            onPress={handleExportWorkPlan}
+            activeOpacity={0.7}
+            disabled={exporting}
+          >
+            <View style={[styles.optionIcon, { backgroundColor: '#F0FDF4' }]}>
+              <MaterialIcons name="assignment" size={24} color="#16A34A" />
+            </View>
+            <View style={styles.optionContent}>
+              <Text style={styles.optionTitle}>Reporte Plan de Trabajo</Text>
+              <Text style={styles.optionSubtitle}>Meta vs realizado por bloque y actividad</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
 
           {/* Todos los registros - siempre disponible */}
           <TouchableOpacity 

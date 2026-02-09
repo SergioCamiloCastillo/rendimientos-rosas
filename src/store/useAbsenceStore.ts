@@ -1,62 +1,61 @@
 import { create } from 'zustand';
-import { AbsenceWithWorker, CreateAbsenceInput } from '../domain/entities';
+import { Absence, CreateAbsenceInput } from '../domain/entities';
 import { AbsenceRepository } from '../data/repositories';
+import { format } from 'date-fns';
 
 interface AbsenceState {
-  absences: AbsenceWithWorker[];
+  absence: Absence | null;
   selectedDate: Date;
   isLoading: boolean;
   error: string | null;
   
   setSelectedDate: (date: Date) => void;
-  fetchAbsencesByDate: (date: Date) => Promise<void>;
-  addAbsence: (input: CreateAbsenceInput) => Promise<void>;
-  deleteAbsence: (id: string) => Promise<void>;
+  fetchAbsenceByDate: (date: Date) => Promise<void>;
+  saveAbsence: (input: CreateAbsenceInput) => Promise<void>;
+  deleteAbsence: () => Promise<void>;
 }
 
 export const useAbsenceStore = create<AbsenceState>((set, get) => ({
-  absences: [],
+  absence: null,
   selectedDate: new Date(),
   isLoading: false,
   error: null,
 
   setSelectedDate: (date: Date) => {
     set({ selectedDate: date });
-    get().fetchAbsencesByDate(date);
+    get().fetchAbsenceByDate(date);
   },
 
-  fetchAbsencesByDate: async (date: Date) => {
+  fetchAbsenceByDate: async (date: Date) => {
     set({ isLoading: true, error: null });
     try {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      const absences = await AbsenceRepository.getByDate(dateStr);
-      set({ absences, isLoading: false });
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const absence = await AbsenceRepository.getByDate(dateStr);
+      set({ absence, isLoading: false });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
     }
   },
 
-  addAbsence: async (input: CreateAbsenceInput) => {
+  saveAbsence: async (input: CreateAbsenceInput) => {
     set({ isLoading: true, error: null });
     try {
-      await AbsenceRepository.create(input);
+      await AbsenceRepository.createOrUpdate(input);
       const { selectedDate } = get();
-      await get().fetchAbsencesByDate(selectedDate);
+      await get().fetchAbsenceByDate(selectedDate);
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
       throw error;
     }
   },
 
-  deleteAbsence: async (id: string) => {
+  deleteAbsence: async () => {
+    const { absence, selectedDate } = get();
+    if (!absence) return;
     set({ isLoading: true, error: null });
     try {
-      await AbsenceRepository.delete(id);
-      const { selectedDate } = get();
-      await get().fetchAbsencesByDate(selectedDate);
+      await AbsenceRepository.delete(absence.id);
+      await get().fetchAbsenceByDate(selectedDate);
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
       throw error;

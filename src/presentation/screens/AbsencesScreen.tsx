@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   Alert,
   RefreshControl,
@@ -11,49 +11,50 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../theme';
-import { Button, BottomSheet, Select, Sidebar, MenuButton } from '../components';
-import { useAbsenceStore, useWorkerStore } from '../../store';
-import { AbsenceWithWorker } from '../../domain/entities';
+import { Input, Button, Sidebar, MenuButton } from '../components';
+import { useAbsenceStore } from '../../store';
 import { useToast } from '../context/ToastContext';
 import { format, addDays, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-const ABSENCE_TYPES = [
-  { label: 'Falta', value: 'falta' },
-  { label: 'Permiso', value: 'permiso' },
-  { label: 'Incapacidad', value: 'incapacidad' },
-  { label: 'Otro', value: 'otro' },
-];
-
 export const AbsencesScreen: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAddAbsence, setShowAddAbsence] = useState(false);
-  const [selectedWorker, setSelectedWorker] = useState('');
-  const [absenceType, setAbsenceType] = useState('falta');
-  const [reason, setReason] = useState('');
+  const [peopleCount, setPeopleCount] = useState('');
+  const [hoursPerPerson, setHoursPerPerson] = useState('');
   const { showToast } = useToast();
 
   const {
-    absences,
+    absence,
     selectedDate,
     isLoading,
     setSelectedDate,
-    fetchAbsencesByDate,
-    addAbsence,
+    fetchAbsenceByDate,
+    saveAbsence,
     deleteAbsence,
   } = useAbsenceStore();
 
-  const { workers, fetchWorkers } = useWorkerStore();
+  useEffect(() => {
+    fetchAbsenceByDate(selectedDate);
+  }, []);
 
   useEffect(() => {
-    fetchWorkers();
-    fetchAbsencesByDate(selectedDate);
-  }, []);
+    if (absence) {
+      setPeopleCount((absence.peopleCount ?? 0).toString());
+      setHoursPerPerson((absence.hoursPerPerson ?? 0).toString());
+    } else {
+      setPeopleCount('');
+      setHoursPerPerson('');
+    }
+  }, [absence]);
+
+  const countNum = parseInt(peopleCount) || 0;
+  const hppNum = parseFloat(hoursPerPerson.replace(',', '.')) || 0;
+  const totalHours = Math.round(countNum * hppNum * 100) / 100;
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchAbsencesByDate(selectedDate);
+    await fetchAbsenceByDate(selectedDate);
     setRefreshing(false);
   };
 
@@ -77,99 +78,58 @@ export const AbsencesScreen: React.FC = () => {
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
 
-  const resetForm = () => {
-    setSelectedWorker('');
-    setAbsenceType('falta');
-    setReason('');
-  };
-
-  const handleAddAbsence = async () => {
-    if (!selectedWorker) {
-      showToast('Selecciona un trabajador', 'error');
+  const handleSave = async () => {
+    if (countNum <= 0) {
+      showToast('Ingresa un número válido de personas', 'warning');
+      return;
+    }
+    if (hppNum <= 0) {
+      showToast('Ingresa las horas por persona', 'warning');
       return;
     }
 
     try {
-      await addAbsence({
-        workerId: selectedWorker,
+      await saveAbsence({
         date: format(selectedDate, 'yyyy-MM-dd'),
-        type: absenceType as 'falta' | 'permiso' | 'incapacidad' | 'otro',
-        reason,
+        peopleCount: countNum,
+        hoursPerPerson: hppNum,
+        hoursLost: totalHours,
       });
-      showToast('Ausencia registrada', 'success');
-      setShowAddAbsence(false);
-      resetForm();
-    } catch (error) {
-      showToast((error as Error).message, 'error');
+      showToast(absence ? 'Ausencia actualizada' : 'Ausencia registrada', 'success');
+    } catch {
+      showToast('Error al guardar la ausencia', 'error');
     }
   };
 
-  const handleDeleteAbsence = (absence: AbsenceWithWorker) => {
+  const handleDelete = () => {
+    if (!absence) return;
     Alert.alert(
       'Eliminar Ausencia',
-      `¿Eliminar la ausencia de ${absence.workerName}?`,
+      '¿Eliminar el registro de ausencia de este día?',
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
           onPress: async () => {
-            await deleteAbsence(absence.id);
-            showToast('Ausencia eliminada', 'success');
+            try {
+              await deleteAbsence();
+              showToast('Ausencia eliminada', 'success');
+            } catch {
+              showToast('Error al eliminar', 'error');
+            }
           },
         },
       ]
     );
   };
 
-  const getTypeLabel = (type: string) => {
-    const found = ABSENCE_TYPES.find(t => t.value === type);
-    return found?.label || type;
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'falta': return colors.danger;
-      case 'permiso': return colors.warning;
-      case 'incapacidad': return colors.primary;
-      default: return colors.textSecondary;
-    }
-  };
-
-  const renderAbsenceItem = ({ item }: { item: AbsenceWithWorker }) => (
-    <View style={styles.absenceCard}>
-      <View style={styles.absenceHeader}>
-        <View style={styles.workerInfo}>
-          <Text style={styles.workerName}>
-            {item.workerCode ? `${item.workerCode} - ` : ''}{item.workerName}
-          </Text>
-          <View style={[styles.typeBadge, { backgroundColor: getTypeColor(item.type) + '20' }]}>
-            <Text style={[styles.typeText, { color: getTypeColor(item.type) }]}>
-              {getTypeLabel(item.type)}
-            </Text>
-          </View>
-        </View>
-        <TouchableOpacity onPress={() => handleDeleteAbsence(item)}>
-          <MaterialIcons name="delete-outline" size={24} color={colors.danger} />
-        </TouchableOpacity>
-      </View>
-      {item.reason && (
-        <Text style={styles.reasonText}>{item.reason}</Text>
-      )}
-    </View>
-  );
-
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <MenuButton onPress={() => setShowMenu(true)} />
         <Text style={styles.title}>Ausencias</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowAddAbsence(true)}
-        >
-          <MaterialIcons name="add" size={24} color={colors.white} />
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <Sidebar visible={showMenu} onClose={() => setShowMenu(false)} />
@@ -193,61 +153,88 @@ export const AbsencesScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.statsRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statValue}>{absences.length}</Text>
-          <Text style={styles.statLabel}>Ausencias del día</Text>
-        </View>
-      </View>
+      <ScrollView
+        style={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialIcons name="person-off" size={24} color={colors.danger} />
+            <Text style={styles.cardTitle}>Registro del día</Text>
+          </View>
 
-      <FlatList
-        data={absences}
-        keyExtractor={item => item.id}
-        renderItem={renderAbsenceItem}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
+          <View style={styles.inputRow}>
+            <View style={styles.inputField}>
+              <Input
+                label="Personas ausentes"
+                placeholder="0"
+                value={peopleCount}
+                onChangeText={setPeopleCount}
+                keyboardType="number-pad"
+              />
+            </View>
+            <View style={styles.inputField}>
+              <Input
+                label="Horas por persona"
+                placeholder="0"
+                value={hoursPerPerson}
+                onChangeText={(v) => setHoursPerPerson(v.replace(',', '.'))}
+                keyboardType="decimal-pad"
+              />
+            </View>
+          </View>
+
+          {countNum > 0 && hppNum > 0 && (
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>{countNum} personas × {hppNum} hrs =</Text>
+              <Text style={styles.totalValue}>{totalHours} hrs perdidas</Text>
+            </View>
+          )}
+
+          <Button
+            title={absence ? 'Actualizar' : 'Guardar'}
+            onPress={handleSave}
+            loading={isLoading}
+          />
+
+          {absence && (
+            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+              <MaterialIcons name="delete" size={20} color={colors.danger} />
+              <Text style={styles.deleteText}>Eliminar registro</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {absence && (
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Resumen</Text>
+            <View style={styles.summaryRow}>
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>{absence.peopleCount}</Text>
+                <Text style={styles.summaryLabel}>Personas</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>{absence.hoursPerPerson ?? 0}</Text>
+                <Text style={styles.summaryLabel}>Hrs/persona</Text>
+              </View>
+              <View style={styles.summaryDivider} />
+              <View style={styles.summaryItem}>
+                <Text style={styles.summaryValue}>{absence.hoursLost}</Text>
+                <Text style={styles.summaryLabel}>Total hrs</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {!absence && (
           <View style={styles.emptyContainer}>
             <MaterialIcons name="check-circle" size={64} color={colors.success} />
             <Text style={styles.emptyText}>Sin ausencias</Text>
             <Text style={styles.emptySubtext}>No hay ausencias registradas para este día</Text>
           </View>
-        }
-      />
-
-      <BottomSheet visible={showAddAbsence} onClose={() => { setShowAddAbsence(false); resetForm(); }}>
-        <Text style={styles.sheetTitle}>Registrar Ausencia</Text>
-        <Text style={styles.sheetDate}>
-          {format(selectedDate, "EEEE, d 'de' MMMM yyyy", { locale: es })}
-        </Text>
-
-        <Select
-          label="Trabajador"
-          placeholder="Seleccionar trabajador"
-          options={workers.map(w => ({ 
-            label: w.code ? `${w.code} - ${w.name}` : w.name, 
-            value: w.id 
-          }))}
-          value={selectedWorker}
-          onChange={setSelectedWorker}
-        />
-
-        <Select
-          label="Tipo de ausencia"
-          placeholder="Seleccionar tipo"
-          options={ABSENCE_TYPES}
-          value={absenceType}
-          onChange={setAbsenceType}
-        />
-
-        <Button
-          title="Registrar Ausencia"
-          onPress={handleAddAbsence}
-          loading={isLoading}
-        />
-      </BottomSheet>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -269,14 +256,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: colors.text,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   dateSelector: {
     flexDirection: 'row',
@@ -314,64 +293,110 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginTop: 2,
   },
-  statsRow: {
+  content: {
+    flex: 1,
     padding: 16,
   },
-  statCard: {
+  card: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 8,
+  },
+  inputField: {
+    flex: 1,
+  },
+  totalRow: {
+    backgroundColor: colors.primaryLight,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
     alignItems: 'center',
   },
-  statValue: {
+  totalLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 10,
+  },
+  deleteText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.danger,
+  },
+  summaryCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryValue: {
     fontSize: 32,
     fontWeight: '700',
     color: colors.danger,
   },
-  statLabel: {
+  summaryLabel: {
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: 4,
   },
-  listContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  absenceCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  absenceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  workerInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  workerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  typeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  typeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  reasonText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 8,
+  summaryDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: colors.border,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -387,17 +412,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: 4,
-  },
-  sheetTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 8,
-  },
-  sheetDate: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 20,
-    textTransform: 'capitalize',
   },
 });

@@ -3,7 +3,8 @@ import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import XLSX from 'xlsx-js-style';
 import { PerformanceRecordWithDetails } from '../domain/entities';
-import { format } from 'date-fns';
+import { WeeklyGoalRepository, PerformanceRepository, ActivityRepository, AbsenceRepository } from '../data/repositories';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 // Función para abrir archivo con app por defecto
@@ -462,4 +463,203 @@ export async function exportWeeklyReport(
   });
 
   await openFileWithDefaultApp(uri);
+}
+
+// Exportar reporte Plan de Trabajo por bloque
+const BLOCKS = ['21', '17', '16', '15', '10'];
+
+export async function exportWorkPlan(date: string): Promise<void> {
+  const dateObj = new Date(date + 'T12:00:00');
+  const weekStart = format(startOfWeek(dateObj, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+  const weekEnd = format(endOfWeek(dateObj, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+
+  // Obtener registros de rendimiento de la semana
+  const allRecords = await PerformanceRepository.getActive();
+  const weekRecords = allRecords.filter(r => r.date >= weekStart && r.date <= weekEnd);
+
+  if (weekRecords.length === 0) {
+    throw new Error('No hay registros de rendimiento para esta semana');
+  }
+
+  // Obtener actividades y metas semanales
+  const activities = await ActivityRepository.getAll();
+  const goals = await WeeklyGoalRepository.getWithDetails(weekStart);
+
+  // Agrupar rendimiento por bloque + actividad desde los shifts
+  // key = "block|activityId"
+  const achieved: Record<string, number> = {};
+
+  weekRecords.forEach(record => {
+    if (record.shifts && record.shifts.length > 0) {
+      record.shifts.forEach(shift => {
+        const block = (shift.block || '').trim();
+        if (block) {
+          const key = `${block}|${record.activityId}`;
+          achieved[key] = (achieved[key] || 0) + shift.achievedPerformance;
+        }
+      });
+    } else {
+      const block = (record.block || '').trim();
+      if (block) {
+        const key = `${block}|${record.activityId}`;
+        achieved[key] = (achieved[key] || 0) + record.achievedPerformance;
+      }
+    }
+  });
+
+  // Construir mapa de metas: key = "block|activityId" -> goalAmount
+  const goalMap: Record<string, number> = {};
+  goals.forEach(g => {
+    if (g.block) {
+      goalMap[`${g.block}|${g.activityId}`] = g.goalAmount;
+    }
+  });
+
+  // Construir filas agrupadas por bloque
+  const rows: any[] = [];
+
+  BLOCKS.forEach(block => {
+    // Encontrar todas las actividades que tienen rendimiento en este bloque
+    const blockEntries: { activityName: string; meta: number; realizado: number }[] = [];
+
+    Object.keys(achieved).forEach(key => {
+      const [b, actId] = key.split('|');
+      if (b === block) {
+        const activity = activities.find(a => a.id === actId);
+        const actName = activity?.name || 'Actividad eliminada';
+        const meta = goalMap[key] || 0;
+        blockEntries.push({
+          activityName: actName,
+          meta,
+          realizado: achieved[key],
+        });
+      }
+    });
+
+    // También agregar metas que no tienen rendimiento aún
+    goals.forEach(g => {
+      if (g.block === block) {
+        const key = `${block}|${g.activityId}`;
+        if (!achieved[key]) {
+          blockEntries.push({
+            activityName: g.activityName,
+            meta: g.goalAmount,
+            realizado: 0,
+          });
+        }
+      }
+    });
+
+    if (blockEntries.length === 0) return;
+
+    blockEntries.forEach((entry, index) => {
+      const pct = entry.meta > 0 ? Math.round((entry.realizado / entry.meta) * 100) : 0;
+      rows.push({
+        'Bloque': index === 0 ? `B${block}` : '',
+        'Actividad': entry.activityName,
+        'Meta': entry.meta || '',
+        'Realizado': entry.realizado,
+        '% Cumplimiento': entry.meta > 0 ? `${pct}%` : '',
+      });
+    });
+  });
+
+  if (rows.length === 0) {
+    throw new Error('No hay datos para exportar');
+  }
+
+  // Obtener ausentismo del rango
+  const absences = await AbsenceRepository.getByDateRange(weekStart, weekEnd);
+  const totalPeople = absences.reduce((sum, a) => sum + (a.peopleCount ?? 0), 0);
+  const totalHoursLost = absences.reduce((sum, a) => sum + (a.hoursLost ?? 0), 0);
+
+  // Fila vacía separadora + fila de ausentismo
+  rows.push({
+    'Bloque': '',
+    'Actividad': '',
+    'Meta': '',
+    'Realizado': '',
+    '% Cumplimiento': '',
+  });
+  const absenceRowIndex = rows.length; // índice 0-based de la fila de ausentismo (en el sheet será +1 por header)
+  rows.push({
+    'Bloque': 'AUSENTISMO',
+    'Actividad': `${totalPeople} personas`,
+    'Meta': '',
+    'Realizado': '',
+    '% Cumplimiento': `${totalHoursLost} hrs perdidas`,
+  });
+
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+
+  // Aplicar estilos a headers
+  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+  for (let col = range.s.c; col <= range.e.c; col++) {
+    const hRef = XLSX.utils.encode_cell({ r: 0, c: col });
+    if (worksheet[hRef]) {
+      worksheet[hRef].s = headerStyle;
+    }
+  }
+
+  // Colorear filas según porcentaje
+  const greenFill = { fgColor: { rgb: 'DCFCE7' } };
+  const yellowFill = { fgColor: { rgb: 'FEF9C3' } };
+  const redFill = { fgColor: { rgb: 'FEE2E2' } };
+  const orangeFill = { fgColor: { rgb: 'FFEDD5' } };
+  const thinBorder = {
+    top: { style: 'thin', color: { rgb: '000000' } },
+    bottom: { style: 'thin', color: { rgb: '000000' } },
+    left: { style: 'thin', color: { rgb: '000000' } },
+    right: { style: 'thin', color: { rgb: '000000' } },
+  };
+
+  for (let row = 1; row <= rows.length; row++) {
+    const pctCell = XLSX.utils.encode_cell({ r: row, c: 4 });
+    if (worksheet[pctCell] && String(worksheet[pctCell].v).includes('%')) {
+      const pct = parseInt(String(worksheet[pctCell].v));
+      const fill = pct >= 100 ? greenFill : pct >= 80 ? yellowFill : redFill;
+      for (let col = range.s.c; col <= range.e.c; col++) {
+        const cRef = XLSX.utils.encode_cell({ r: row, c: col });
+        if (worksheet[cRef]) {
+          worksheet[cRef].s = { fill, border: thinBorder };
+        }
+      }
+    }
+  }
+
+  // Estilo para fila de ausentismo
+  const absenceSheetRow = absenceRowIndex + 1; // +1 por header
+  for (let col = range.s.c; col <= range.e.c; col++) {
+    const cRef = XLSX.utils.encode_cell({ r: absenceSheetRow, c: col });
+    if (worksheet[cRef]) {
+      worksheet[cRef].s = {
+        fill: orangeFill,
+        font: { bold: true, sz: 11 },
+        border: thinBorder,
+      };
+    }
+  }
+
+  // Anchos de columna
+  worksheet['!cols'] = [
+    { wch: 14 },  // Bloque
+    { wch: 25 },  // Actividad
+    { wch: 12 },  // Meta
+    { wch: 12 },  // Realizado
+    { wch: 18 },  // % Cumplimiento
+  ];
+
+  const dateFormatted = format(dateObj, 'dd-MM-yyyy');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Plan de Trabajo');
+
+  const wpFilename = `plan_de_trabajo_${dateFormatted}`;
+  const wpOut = XLSX.write(workbook, { type: 'base64', bookType: 'xlsx' });
+  const wpUri = (FileSystem.documentDirectory || '') + `${wpFilename}.xlsx`;
+
+  await FileSystem.writeAsStringAsync(wpUri, wpOut, {
+    encoding: 'base64',
+  });
+
+  await openFileWithDefaultApp(wpUri);
 }
