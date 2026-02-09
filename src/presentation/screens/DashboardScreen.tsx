@@ -619,13 +619,18 @@ export const DashboardScreen: React.FC = () => {
           onChangeText={(value) => setAchievedPerformance(value.replace(',', '.'))}
         />
 
-        <Input
-          label="Bloque"
-          placeholder="Ej: 1, 2, 3..."
-          value={block}
-          onChangeText={setBlock}
-          keyboardType="number-pad"
-        />
+        <Text style={styles.blockSelectorLabel}>Bloque</Text>
+        <View style={styles.blockSelectorRow}>
+          {['21', '17', '16', '15', '10'].map(b => (
+            <TouchableOpacity
+              key={b}
+              style={[styles.blockBtn, block === b && styles.blockBtnActive]}
+              onPress={() => setBlock(block === b ? '' : b)}
+            >
+              <Text style={[styles.blockBtnText, block === b && styles.blockBtnTextActive]}>{b}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <Input
           label="Notas (opcional)"
@@ -704,13 +709,18 @@ export const DashboardScreen: React.FC = () => {
               
               <View style={styles.editShiftTimeRow}>
                 <View style={styles.editShiftTimeField}>
-                  <Input
-                    label="Bloque"
-                    placeholder="Ej: 1, 2..."
-                    keyboardType="number-pad"
-                    value={shift.block || ''}
-                    onChangeText={(value) => handleUpdateShift(index, 'block', value)}
-                  />
+                  <Text style={styles.blockSelectorLabel}>Bloque</Text>
+                  <View style={styles.blockSelectorRow}>
+                    {['21', '17', '16', '15', '10'].map(b => (
+                      <TouchableOpacity
+                        key={b}
+                        style={[styles.blockBtnSmall, shift.block === b && styles.blockBtnActive]}
+                        onPress={() => handleUpdateShift(index, 'block', shift.block === b ? '' : b)}
+                      >
+                        <Text style={[styles.blockBtnTextSmall, shift.block === b && styles.blockBtnTextActive]}>{b}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 </View>
                 <View style={styles.editShiftTimeField}>
                   <Input
@@ -1320,5 +1330,53 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.danger,
+  },
+  blockSelectorLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  blockSelectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  blockBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blockBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  blockBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  blockBtnTextActive: {
+    color: colors.primary,
+  },
+  blockBtnSmall: {
+    flex: 1,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  blockBtnTextSmall: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
 });

@@ -26,19 +26,24 @@ export class WeeklyGoalRepository {
     return goals.filter(g => g.weekStartDate === weekStartDate);
   }
 
-  static async getByActivityAndWeek(activityId: string, weekStartDate: string): Promise<WeeklyGoal | null> {
+  static async getByActivityAndWeek(activityId: string, weekStartDate: string, block?: string): Promise<WeeklyGoal | null> {
     const goals = await this.getActive();
-    return goals.find(g => g.activityId === activityId && g.weekStartDate === weekStartDate) || null;
+    return goals.find(g => 
+      g.activityId === activityId && 
+      g.weekStartDate === weekStartDate &&
+      (block ? g.block === block : !g.block)
+    ) || null;
   }
 
   static async create(input: CreateWeeklyGoalInput): Promise<WeeklyGoal> {
     const goals = await this.getAll();
     const now = new Date().toISOString();
 
-    // Verificar si ya existe una meta para esta actividad y semana
+    // Verificar si ya existe una meta para esta actividad, semana y bloque
     const existingIndex = goals.findIndex(
       g => g.activityId === input.activityId && 
            g.weekStartDate === input.weekStartDate &&
+           (input.block ? g.block === input.block : !g.block) &&
            !g.isDeleted
     );
 
@@ -116,7 +121,29 @@ export class WeeklyGoalRepository {
     return goals.map(goal => {
       const activity = activities.find(a => a.id === goal.activityId);
       const activityRecords = records.filter(r => r.activityId === goal.activityId);
-      const achieved = activityRecords.reduce((sum, r) => sum + r.achievedPerformance, 0);
+      
+      // Si la meta tiene bloque, filtrar rendimiento solo de ese bloque
+      let achieved = 0;
+      if (goal.block) {
+        const blockFilter = goal.block.toLowerCase().trim();
+        for (const r of activityRecords) {
+          if (r.shifts && r.shifts.length > 0) {
+            // Sumar solo el rendimiento de los turnos del bloque
+            for (const s of r.shifts) {
+              if (s.block && s.block.toLowerCase().trim() === blockFilter) {
+                achieved += s.achievedPerformance;
+              }
+            }
+          } else if (r.block && r.block.toLowerCase().trim() === blockFilter) {
+            // Registros antiguos sin turnos
+            achieved += r.achievedPerformance;
+          }
+        }
+      } else {
+        // Sin bloque: sumar todo el rendimiento de la actividad
+        achieved = activityRecords.reduce((sum, r) => sum + r.achievedPerformance, 0);
+      }
+      
       const remaining = Math.max(0, goal.goalAmount - achieved);
       const percentage = goal.goalAmount > 0 ? Math.round((achieved / goal.goalAmount) * 100) : 0;
 

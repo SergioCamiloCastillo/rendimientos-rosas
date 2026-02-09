@@ -6,6 +6,8 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Alert,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -21,14 +23,23 @@ export const WeeklyGoalsScreen: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [showAddGoal, setShowAddGoal] = useState(false);
+  const [showEditGoal, setShowEditGoal] = useState(false);
+  const [editingGoalId, setEditingGoalId] = useState('');
   const [selectedActivity, setSelectedActivity] = useState('');
-  const [goalAmount, setGoalAmount] = useState('');
+  const BLOCKS = ['21', '17', '16', '15', '10'];
+  const [blockGoals, setBlockGoals] = useState<Record<string, string>>(
+    Object.fromEntries(BLOCKS.map(b => [b, '']))
+  );
+  const [editBlock, setEditBlock] = useState('');
+  const [editGoalAmount, setEditGoalAmount] = useState('');
+  const [editActivityName, setEditActivityName] = useState('');
+  const [editActivityUnit, setEditActivityUnit] = useState('');
   const [currentWeekStart, setCurrentWeekStart] = useState(() => 
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
 
   const { activities, fetchActivities } = useActivityStore();
-  const { goals, fetchGoals, addGoal, setSelectedWeekStart, isLoading } = useWeeklyGoalStore();
+  const { goals, fetchGoals, addGoalForBlocks, updateGoal, deleteGoal, setSelectedWeekStart, isLoading } = useWeeklyGoalStore();
   const { showToast } = useToast();
 
   const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
@@ -62,31 +73,97 @@ export const WeeklyGoalsScreen: React.FC = () => {
     setCurrentWeekStart(addWeeks(currentWeekStart, 1));
   };
 
+  const updateBlockGoal = (block: string, value: string) => {
+    setBlockGoals(prev => ({ ...prev, [block]: value.replace(',', '.') }));
+  };
+
   const handleAddGoal = async () => {
-    if (!selectedActivity || !goalAmount) {
-      showToast('Selecciona una actividad y define la meta', 'warning');
+    if (!selectedActivity) {
+      showToast('Selecciona una actividad', 'warning');
       return;
     }
 
-    const amount = parseFloat(goalAmount);
-    if (isNaN(amount) || amount <= 0) {
-      showToast('La meta debe ser un número positivo', 'warning');
+    // Recoger bloques con meta válida
+    const entries = BLOCKS
+      .filter(b => blockGoals[b].trim() !== '')
+      .map(b => ({ block: b, amount: parseFloat(blockGoals[b]) }));
+
+    if (entries.length === 0) {
+      showToast('Ingresa la meta en al menos un bloque', 'warning');
+      return;
+    }
+
+    const invalid = entries.find(e => isNaN(e.amount) || e.amount <= 0);
+    if (invalid) {
+      showToast(`La meta del bloque ${invalid.block} debe ser un número positivo`, 'warning');
       return;
     }
 
     try {
-      await addGoal({
-        activityId: selectedActivity,
-        weekStartDate: weekStartStr,
-        goalAmount: amount,
-      });
+      // Crear una meta por cada bloque con su cantidad individual
+      for (const entry of entries) {
+        await addGoalForBlocks(
+          { activityId: selectedActivity, weekStartDate: weekStartStr, goalAmount: entry.amount },
+          [entry.block],
+        );
+      }
+      showToast(`Meta agregada para ${entries.length} bloque(s)`, 'success');
       setSelectedActivity('');
-      setGoalAmount('');
+      setBlockGoals(Object.fromEntries(BLOCKS.map(b => [b, ''])));
       setShowAddGoal(false);
-      showToast('Meta semanal agregada', 'success');
     } catch {
       showToast('Error al agregar la meta', 'error');
     }
+  };
+
+  const handleOpenEdit = (item: any) => {
+    setEditingGoalId(item.id);
+    setEditBlock(item.block || '');
+    setEditGoalAmount(item.goalAmount.toString());
+    setEditActivityName(item.activityName);
+    setEditActivityUnit(item.activityUnit);
+    setShowEditGoal(true);
+  };
+
+  const handleEditGoal = async () => {
+    if (!editGoalAmount.trim()) {
+      showToast('Ingresa la meta', 'warning');
+      return;
+    }
+    const amount = parseFloat(editGoalAmount);
+    if (isNaN(amount) || amount <= 0) {
+      showToast('La meta debe ser un número positivo', 'warning');
+      return;
+    }
+    try {
+      await updateGoal(editingGoalId, { goalAmount: amount });
+      setShowEditGoal(false);
+      showToast('Meta actualizada', 'success');
+    } catch {
+      showToast('Error al actualizar la meta', 'error');
+    }
+  };
+
+  const handleDeleteGoal = (id: string, activityName: string, block?: string) => {
+    Alert.alert(
+      'Eliminar meta',
+      `¿Eliminar la meta de ${activityName}${block ? ` - Bloque ${block}` : ''}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteGoal(id);
+              showToast('Meta eliminada', 'success');
+            } catch {
+              showToast('Error al eliminar la meta', 'error');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getProgressColor = (percentage: number) => {
@@ -141,7 +218,21 @@ export const WeeklyGoalsScreen: React.FC = () => {
           goals.map((item) => (
             <View key={item.id} style={styles.progressCard}>
               <View style={styles.cardHeader}>
-                <Text style={styles.activityName}>{item.activityName}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.activityName}>{item.activityName}</Text>
+                  <Text style={styles.blockLabel}>Bloque {item.block}</Text>
+                </View>
+                <View style={styles.cardActions}>
+                  <TouchableOpacity onPress={() => handleOpenEdit(item)} style={styles.cardActionBtn}>
+                    <MaterialIcons name="edit" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDeleteGoal(item.id, item.activityName, item.block)} style={styles.cardActionBtn}>
+                    <MaterialIcons name="delete" size={20} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.percentageRow}>
                 <View style={[styles.percentageBadge, { backgroundColor: getProgressColor(item.percentage) }]}>
                   <Text style={styles.percentageText}>{item.percentage}%</Text>
                 </View>
@@ -196,16 +287,61 @@ export const WeeklyGoalsScreen: React.FC = () => {
           onChange={setSelectedActivity}
         />
 
+        <Text style={styles.gridLabel}>
+          Meta por bloque{selectedActivity ? ` (${activities.find(a => a.id === selectedActivity)?.unit || ''})` : ''}
+        </Text>
+        <View style={styles.gridContainer}>
+          <View style={styles.gridRow}>
+            {BLOCKS.map(b => (
+              <View key={`label-${b}`} style={styles.gridCell}>
+                <Text style={styles.gridBlockLabel}>B{b}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.gridRow}>
+            {BLOCKS.map(b => (
+              <View key={`input-${b}`} style={styles.gridCell}>
+                <TextInput
+                  style={styles.gridInput}
+                  value={blockGoals[b]}
+                  onChangeText={(v) => updateBlockGoal(b, v)}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor={colors.gray[400]}
+                  textAlign="center"
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <Text style={styles.sheetHint}>
+          Ingresa la meta solo en los bloques que necesites
+        </Text>
+
+        <Button
+          title={`Agregar Meta (${BLOCKS.filter(b => blockGoals[b].trim() !== '').length} bloques)`}
+          onPress={handleAddGoal}
+          loading={isLoading}
+        />
+      </BottomSheet>
+
+      <BottomSheet visible={showEditGoal} onClose={() => setShowEditGoal(false)}>
+        <Text style={styles.sheetTitle}>Editar Meta</Text>
+        <Text style={styles.sheetSubtitle}>
+          {editActivityName} - Bloque {editBlock}
+        </Text>
+
         <Input
-          label={`Meta semanal${selectedActivity ? ` (${activities.find(a => a.id === selectedActivity)?.unit || ''})` : ''}`}
-          value={goalAmount}
-          onChangeText={(value) => setGoalAmount(value.replace(',', '.'))}
+          label={`Meta semanal (${editActivityUnit})`}
+          value={editGoalAmount}
+          onChangeText={(value) => setEditGoalAmount(value.replace(',', '.'))}
           keyboardType="decimal-pad"
         />
 
         <Button
-          title="Agregar Meta"
-          onPress={handleAddGoal}
+          title="Guardar Cambios"
+          onPress={handleEditGoal}
           loading={isLoading}
         />
       </BottomSheet>
@@ -307,7 +443,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
-    flex: 1,
+  },
+  blockLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.primary,
+    marginTop: 2,
+  },
+  cardActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  cardActionBtn: {
+    padding: 6,
+  },
+  percentageRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
   },
   percentageBadge: {
     paddingHorizontal: 10,
@@ -358,5 +510,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginBottom: 20,
+  },
+  sheetHint: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  gridLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  gridContainer: {
+    marginBottom: 12,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  gridCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  gridBlockLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
+    paddingVertical: 8,
+  },
+  gridInput: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    width: '100%',
+    height: 44,
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'center',
   },
 });

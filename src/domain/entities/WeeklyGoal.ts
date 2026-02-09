@@ -5,6 +5,7 @@ export const WeeklyGoalSchema = z.object({
   activityId: z.string().uuid(),
   weekStartDate: z.string(), // Fecha de inicio de la semana (lunes) en formato yyyy-MM-dd
   goalAmount: z.number().positive('La meta debe ser positiva'),
+  block: z.string().optional(), // Bloque específico para esta meta
   isDeleted: z.boolean().default(false),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),

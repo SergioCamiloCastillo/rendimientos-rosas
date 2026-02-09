@@ -11,6 +11,7 @@ interface WeeklyGoalState {
   setSelectedWeekStart: (weekStart: string) => void;
   fetchGoals: () => Promise<void>;
   addGoal: (input: CreateWeeklyGoalInput) => Promise<WeeklyGoal>;
+  addGoalForBlocks: (input: Omit<CreateWeeklyGoalInput, 'block'>, blocks: string[]) => Promise<void>;
   updateGoal: (id: string, input: Partial<CreateWeeklyGoalInput>) => Promise<void>;
   deleteGoal: (id: string) => Promise<void>;
 }
@@ -48,6 +49,23 @@ export const useWeeklyGoalStore = create<WeeklyGoalState>((set, get) => ({
       return goal;
     } catch (error) {
       set({ error: 'Error al crear meta semanal', isLoading: false });
+      throw error;
+    }
+  },
+
+  addGoalForBlocks: async (input: Omit<CreateWeeklyGoalInput, 'block'>, blocks: string[]) => {
+    set({ isLoading: true, error: null });
+    try {
+      for (const block of blocks) {
+        await WeeklyGoalRepository.create({
+          ...input,
+          block: block.trim(),
+        });
+      }
+      await get().fetchGoals();
+      set({ isLoading: false });
+    } catch (error) {
+      set({ error: 'Error al crear metas semanales', isLoading: false });
       throw error;
     }
   },
