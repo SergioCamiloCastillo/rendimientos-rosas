@@ -302,7 +302,7 @@ export class PerformanceRepository {
       const totalHoursRaw = r.totalHours || 0;
       const totalHours = Math.round(totalHoursRaw * 10) / 10;
       const expectedTotal = totalHours > 0 
-        ? Math.round(r.expectedPerformance * totalHours)
+        ? r.expectedPerformance * totalHours
         : r.expectedPerformance;
       const recordPercentage = expectedTotal > 0 
         ? (r.achievedPerformance / expectedTotal) * 100 

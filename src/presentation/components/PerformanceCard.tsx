@@ -28,7 +28,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
   // Para registros con horas: meta = expectedPerformance * totalHours
   // Para registros antiguos sin horas: usar expectedPerformance directamente
   const expectedTotal = hasHours 
-    ? Math.round(record.expectedPerformance * totalHours)
+    ? record.expectedPerformance * totalHours
     : record.expectedPerformance;
   
   const percentage = expectedTotal > 0 
@@ -140,7 +140,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Meta</Text>
           <Text style={styles.statValue}>
-            {hasHours ? expectedTotal.toFixed(0) : record.expectedPerformance} {record.activityUnit}
+            {hasHours ? (Number.isInteger(expectedTotal) ? expectedTotal : expectedTotal.toFixed(1)) : record.expectedPerformance} {record.activityUnit}
           </Text>
         </View>
         {hasHours && (

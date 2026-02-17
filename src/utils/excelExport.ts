@@ -59,7 +59,7 @@ const calculatePercentage = (record: PerformanceRecordWithDetails): number => {
   const totalHoursRaw = record.totalHours || 0;
   const totalHours = Math.round(totalHoursRaw * 10) / 10;
   const expectedTotal = totalHours > 0 
-    ? Math.round(record.expectedPerformance * totalHours)
+    ? record.expectedPerformance * totalHours
     : record.expectedPerformance;
   return expectedTotal > 0 
     ? Math.round((record.achievedPerformance / expectedTotal) * 100)
@@ -147,7 +147,7 @@ const expandRecordsWithShifts = (records: PerformanceRecordWithDetails[]) => {
     const percentage = calculatePercentage(record);
     const totalHours = Math.round((record.totalHours || 0) * 10) / 10;
     const expectedTotal = totalHours > 0 
-      ? Math.round(record.expectedPerformance * totalHours)
+      ? record.expectedPerformance * totalHours
       : record.expectedPerformance;
     
     if (record.shifts && record.shifts.length > 0) {
