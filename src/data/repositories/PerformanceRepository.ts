@@ -300,7 +300,7 @@ export class PerformanceRepository {
     
     for (const r of records) {
       const totalHoursRaw = r.totalHours || 0;
-      const totalHours = Math.round(totalHoursRaw * 10) / 10;
+      const totalHours = Math.round(totalHoursRaw * 100) / 100;
       const expectedTotal = totalHours > 0 
         ? r.expectedPerformance * totalHours
         : r.expectedPerformance;

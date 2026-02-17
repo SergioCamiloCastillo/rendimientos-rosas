@@ -57,7 +57,7 @@ const formatTimeToAMPM = (time: string): string => {
 // Función helper para calcular porcentaje correcto
 const calculatePercentage = (record: PerformanceRecordWithDetails): number => {
   const totalHoursRaw = record.totalHours || 0;
-  const totalHours = Math.round(totalHoursRaw * 10) / 10;
+  const totalHours = Math.round(totalHoursRaw * 100) / 100;
   const expectedTotal = totalHours > 0 
     ? record.expectedPerformance * totalHours
     : record.expectedPerformance;
@@ -145,7 +145,7 @@ const expandRecordsWithShifts = (records: PerformanceRecordWithDetails[]) => {
   
   records.forEach(record => {
     const percentage = calculatePercentage(record);
-    const totalHours = Math.round((record.totalHours || 0) * 10) / 10;
+    const totalHours = Math.round((record.totalHours || 0) * 100) / 100;
     const expectedTotal = totalHours > 0 
       ? record.expectedPerformance * totalHours
       : record.expectedPerformance;

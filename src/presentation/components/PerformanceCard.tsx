@@ -22,7 +22,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
 }) => {
   // Calcular meta total basada en horas trabajadas
   const totalHoursRaw = record.totalHours || 0;
-  const totalHours = Math.round(totalHoursRaw * 10) / 10; // Redondear a 1 decimal
+  const totalHours = Math.round(totalHoursRaw * 100) / 100; // Redondear a 2 decimales
   const hasHours = totalHours > 0;
   
   // Para registros con horas: meta = expectedPerformance * totalHours

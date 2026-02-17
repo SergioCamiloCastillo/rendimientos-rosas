@@ -81,7 +81,7 @@ export const StatsScreen: React.FC = () => {
   };
 
   const calculatePercentage = (record: PerformanceRecordWithDetails): number => {
-    const totalHours = Math.round((record.totalHours || 0) * 10) / 10;
+    const totalHours = Math.round((record.totalHours || 0) * 100) / 100;
     const expectedTotal = totalHours > 0 
       ? record.expectedPerformance * totalHours
       : record.expectedPerformance;
