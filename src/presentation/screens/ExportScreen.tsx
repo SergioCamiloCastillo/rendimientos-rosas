@@ -13,7 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme';
 import { usePerformanceStore, useWorkerStore, useActivityStore } from '../../store';
-import { exportToExcel, exportByActivity, exportByWorker, exportWeeklyReport, exportWorkPlan } from '../../utils/excelExport';
+import { exportToExcel, exportByActivity, exportByWorker, exportWeeklyReport, exportWorkPlan, WEEKLY_SUMMARY_FIELDS, WEEKLY_DETAIL_FIELDS } from '../../utils/excelExport';
 import { useToast } from '../context/ToastContext';
 import { PerformanceRepository } from '../../data/repositories';
 import { format, startOfWeek, endOfWeek, subWeeks, differenceInDays } from 'date-fns';
@@ -36,6 +36,12 @@ export const ExportScreen: React.FC = () => {
   // Filtros específicos
   const [selectedWorker, setSelectedWorker] = useState('');
   const [selectedActivity, setSelectedActivity] = useState('');
+  const [selectedBlock, setSelectedBlock] = useState('');
+
+  // Selector de campos para reporte semanal
+  const [showFieldSelector, setShowFieldSelector] = useState(false);
+  const [selectedSummaryFields, setSelectedSummaryFields] = useState<string[]>([...WEEKLY_SUMMARY_FIELDS]);
+  const [selectedDetailFields, setSelectedDetailFields] = useState<string[]>([...WEEKLY_DETAIL_FIELDS]);
 
   useEffect(() => {
     fetchWorkers();
@@ -54,6 +60,10 @@ export const ExportScreen: React.FC = () => {
     
     if (selectedActivity) {
       filters.activityId = selectedActivity;
+    }
+
+    if (selectedBlock) {
+      filters.block = selectedBlock;
     }
     
     return await PerformanceRepository.getWithDetails(filters);
@@ -80,7 +90,9 @@ export const ExportScreen: React.FC = () => {
         await exportWeeklyReport(
           records, 
           format(startDate, 'yyyy-MM-dd'),
-          format(endDate, 'yyyy-MM-dd')
+          format(endDate, 'yyyy-MM-dd'),
+          selectedSummaryFields,
+          selectedDetailFields,
         );
       }
       showToast('Archivo exportado correctamente', 'success');
@@ -188,12 +200,13 @@ export const ExportScreen: React.FC = () => {
         <View style={styles.filterSection}>
           <View style={styles.filterHeader}>
             <Text style={styles.sectionTitle}>Filtros opcionales</Text>
-            {(selectedWorker || selectedActivity) && (
+            {(selectedWorker || selectedActivity || selectedBlock) && (
               <TouchableOpacity 
                 style={styles.clearFiltersBtn}
                 onPress={() => {
                   setSelectedWorker('');
                   setSelectedActivity('');
+                  setSelectedBlock('');
                 }}
               >
                 <MaterialIcons name="clear" size={16} color={colors.danger} />
@@ -217,6 +230,21 @@ export const ExportScreen: React.FC = () => {
             value={selectedActivity}
             onChange={setSelectedActivity}
           />
+
+          <Select
+            label="Bloque (opcional)"
+            placeholder="Todos los bloques"
+            options={[
+              { label: 'Todos los bloques', value: '' },
+              { label: 'Bloque 21', value: '21' },
+              { label: 'Bloque 17', value: '17' },
+              { label: 'Bloque 16', value: '16' },
+              { label: 'Bloque 15', value: '15' },
+              { label: 'Bloque 10', value: '10' },
+            ]}
+            value={selectedBlock}
+            onChange={setSelectedBlock}
+          />
         </View>
 
         {/* Opciones de exportación */}
@@ -227,7 +255,7 @@ export const ExportScreen: React.FC = () => {
           {!selectedWorker && !selectedActivity && differenceInDays(endDate, startDate) <= 7 && (
             <TouchableOpacity 
               style={styles.exportOption}
-              onPress={() => handleExport('weekly')}
+              onPress={() => setShowFieldSelector(true)}
               activeOpacity={0.7}
               disabled={exporting}
             >
@@ -238,7 +266,7 @@ export const ExportScreen: React.FC = () => {
                 <Text style={styles.optionTitle}>Reporte Semanal</Text>
                 <Text style={styles.optionSubtitle}>Resumen + detalle por trabajador</Text>
               </View>
-              <Text style={styles.chevron}>›</Text>
+              <MaterialIcons name="tune" size={20} color={colors.textLight} />
             </TouchableOpacity>
           )}
 
@@ -339,6 +367,110 @@ export const ExportScreen: React.FC = () => {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Modal selector de campos para Reporte Semanal */}
+      <Modal visible={showFieldSelector} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '85%' }]}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowFieldSelector(false)}>
+                <Text style={styles.modalCancel}>Cancelar</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Columnas del Excel</Text>
+              <TouchableOpacity onPress={() => {
+                setShowFieldSelector(false);
+                handleExport('weekly');
+              }}>
+                <Text style={styles.modalDone}>Exportar</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+              {/* Campos del Resumen */}
+              <Text style={styles.fieldSectionTitle}>Hoja: Resumen Semanal</Text>
+              <View style={styles.fieldChipsContainer}>
+                {WEEKLY_SUMMARY_FIELDS.map(field => {
+                  const isSelected = selectedSummaryFields.includes(field);
+                  return (
+                    <TouchableOpacity
+                      key={`s-${field}`}
+                      style={[styles.fieldChip, isSelected && styles.fieldChipSelected]}
+                      onPress={() => {
+                        setSelectedSummaryFields(prev =>
+                          isSelected
+                            ? prev.filter(f => f !== field)
+                            : [...prev, field]
+                        );
+                      }}
+                    >
+                      <MaterialIcons
+                        name={isSelected ? 'check-box' : 'check-box-outline-blank'}
+                        size={18}
+                        color={isSelected ? '#fff' : colors.textSecondary}
+                      />
+                      <Text style={[styles.fieldChipText, isSelected && styles.fieldChipTextSelected]}>
+                        {field}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Campos del Detalle */}
+              <Text style={[styles.fieldSectionTitle, { marginTop: 16 }]}>Hoja: Detalle</Text>
+              <View style={styles.fieldChipsContainer}>
+                {WEEKLY_DETAIL_FIELDS.map(field => {
+                  const isSelected = selectedDetailFields.includes(field);
+                  return (
+                    <TouchableOpacity
+                      key={`d-${field}`}
+                      style={[styles.fieldChip, isSelected && styles.fieldChipSelected]}
+                      onPress={() => {
+                        setSelectedDetailFields(prev =>
+                          isSelected
+                            ? prev.filter(f => f !== field)
+                            : [...prev, field]
+                        );
+                      }}
+                    >
+                      <MaterialIcons
+                        name={isSelected ? 'check-box' : 'check-box-outline-blank'}
+                        size={18}
+                        color={isSelected ? '#fff' : colors.textSecondary}
+                      />
+                      <Text style={[styles.fieldChipText, isSelected && styles.fieldChipTextSelected]}>
+                        {field}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Botones rápidos */}
+              <View style={styles.fieldQuickActions}>
+                <TouchableOpacity
+                  style={styles.fieldQuickBtn}
+                  onPress={() => {
+                    setSelectedSummaryFields([...WEEKLY_SUMMARY_FIELDS]);
+                    setSelectedDetailFields([...WEEKLY_DETAIL_FIELDS]);
+                  }}
+                >
+                  <Text style={styles.fieldQuickBtnText}>Seleccionar todos</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.fieldQuickBtn, { backgroundColor: colors.dangerLight }]}
+                  onPress={() => {
+                    setSelectedSummaryFields([]);
+                    setSelectedDetailFields([]);
+                  }}
+                >
+                  <Text style={[styles.fieldQuickBtnText, { color: colors.danger }]}>Deseleccionar todos</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ height: 24 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Date Pickers */}
       {Platform.OS === 'ios' ? (
@@ -603,5 +735,56 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.danger,
     fontWeight: '500',
+  },
+  fieldSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 10,
+  },
+  fieldChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  fieldChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  fieldChipSelected: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  fieldChipText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  fieldChipTextSelected: {
+    color: '#fff',
+  },
+  fieldQuickActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  fieldQuickBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+  },
+  fieldQuickBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
   },
 });

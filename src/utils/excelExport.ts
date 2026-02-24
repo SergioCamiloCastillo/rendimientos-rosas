@@ -66,11 +66,35 @@ const calculatePercentage = (record: PerformanceRecordWithDetails): number => {
     : 0;
 };
 
-// Headers del Excel
+// Headers del Excel (detalle)
 const HEADERS = [
   'Fecha', 'Nombre', 'Código', 'Labor', 'Bloque', 'Hora Inicio', 'Hora Fin', 
   'Total Horas', 'Rend. Establecido', 'Total', '% Cumplimiento', 'Meta Total', 'Notas'
 ];
+
+// Headers del resumen semanal
+export const WEEKLY_SUMMARY_FIELDS = [
+  'Código', 'Nombre', 'Total Horas', 'Total Rendimiento', 'Registros', '% Promedio',
+];
+
+// Headers del detalle semanal
+export const WEEKLY_DETAIL_FIELDS = [
+  'Fecha', 'Nombre', 'Código', 'Labor', 'Bloque', 'Hora Inicio', 'Hora Fin',
+  'Total Horas', 'Rend. Establecido', 'Total', '% Cumplimiento', 'Meta Total', 'Notas',
+];
+
+// Función helper para filtrar columnas de un array de objetos
+const filterColumns = (rows: Record<string, any>[], selectedFields: string[]): Record<string, any>[] => {
+  return rows.map(row => {
+    const filtered: Record<string, any> = {};
+    selectedFields.forEach(field => {
+      if (field in row) {
+        filtered[field] = row[field];
+      }
+    });
+    return filtered;
+  });
+};
 
 // Estilo para headers (fondo azul, texto blanco, negrita)
 const headerStyle = {
@@ -366,7 +390,9 @@ export async function exportByWorker(
 export async function exportWeeklyReport(
   records: PerformanceRecordWithDetails[],
   weekStart: string,
-  weekEnd: string
+  weekEnd: string,
+  selectedSummaryFields?: string[],
+  selectedDetailFields?: string[],
 ): Promise<void> {
   const workbook = XLSX.utils.book_new();
   
@@ -398,7 +424,7 @@ export async function exportWeeklyReport(
     workerSummary[key].percentageSum += calculatePercentage(record);
   });
   
-  const summaryData = Object.values(workerSummary).map(worker => ({
+  let summaryData: Record<string, any>[] = Object.values(workerSummary).map(worker => ({
     'Código': worker.code,
     'Nombre': worker.name,
     'Total Horas': worker.totalHours.toFixed(1),
@@ -423,35 +449,37 @@ export async function exportWeeklyReport(
     'Registros': grandTotalRecords,
     '% Promedio': `${grandAvgPercentage}%`,
   });
+
+  // Filtrar columnas del resumen
+  if (selectedSummaryFields && selectedSummaryFields.length > 0) {
+    summaryData = filterColumns(summaryData, selectedSummaryFields);
+  }
   
   const summarySheet = XLSX.utils.json_to_sheet(summaryData);
-  // Aplicar estilos al resumen
   const summaryRange = XLSX.utils.decode_range(summarySheet['!ref'] || 'A1');
   for (let col = summaryRange.s.c; col <= summaryRange.e.c; col++) {
     const cellRef = XLSX.utils.encode_cell({ r: 0, c: col });
     if (summarySheet[cellRef]) {
       summarySheet[cellRef].s = headerStyle;
     }
-    // Fila de totales
     const totalRef = XLSX.utils.encode_cell({ r: summaryData.length, c: col });
     if (summarySheet[totalRef]) {
       summarySheet[totalRef].s = totalStyle;
     }
   }
-  summarySheet['!cols'] = [
-    { wch: 10 },  // Código
-    { wch: 20 },  // Nombre
-    { wch: 12 },  // Total Horas
-    { wch: 16 },  // Total Rendimiento
-    { wch: 10 },  // Registros
-    { wch: 12 },  // % Promedio
-  ];
+  const colCount = (selectedSummaryFields || WEEKLY_SUMMARY_FIELDS).length;
+  summarySheet['!cols'] = Array.from({ length: colCount }, () => ({ wch: 16 }));
   XLSX.utils.book_append_sheet(workbook, summarySheet, 'Resumen Semanal');
   
   // Hoja 2: Detalle completo
-  const detailData = expandRecordsWithShifts(records);
+  let detailData = expandRecordsWithShifts(records);
+  if (selectedDetailFields && selectedDetailFields.length > 0) {
+    detailData = filterColumns(detailData, selectedDetailFields);
+  }
   const detailSheet = XLSX.utils.json_to_sheet(detailData);
   applyHeaderStyles(detailSheet, detailData.length);
+  const detailColCount = (selectedDetailFields || WEEKLY_DETAIL_FIELDS).length;
+  detailSheet['!cols'] = Array.from({ length: detailColCount }, () => ({ wch: 14 }));
   XLSX.utils.book_append_sheet(workbook, detailSheet, 'Detalle');
 
   const filename = `reporte_semanal_${weekStart}_${weekEnd}`;
