@@ -15,8 +15,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
 import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker, Sidebar, MenuButton } from '../components';
-import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
-import { format, addDays, subDays } from 'date-fns';
+
+import { useWorkerStore, useActivityStore, usePerformanceStore, useBlockStore } from '../../store';
+import { ActivityRepository } from '../../data/repositories';
+import { format, addDays, subDays, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '../context/ToastContext';
 
@@ -40,12 +42,15 @@ export const DashboardScreen: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [editingShifts, setEditingShifts] = useState<any[]>([]);
   const [shiftErrors, setShiftErrors] = useState<number[]>([]);
+  const [addAttempted, setAddAttempted] = useState(false);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const { showToast } = useToast();
 
   const { workers, fetchWorkers } = useWorkerStore();
   const { activities, fetchActivities } = useActivityStore();
+  const { blocks: blockList, fetchBlocks } = useBlockStore();
+  const blockNames = blockList.map(b => b.name);
   const { 
     selectedDateRecords,
     selectedDate,
@@ -110,6 +115,7 @@ export const DashboardScreen: React.FC = () => {
     await Promise.all([
       fetchWorkers(),
       fetchActivities(),
+      fetchBlocks(),
       fetchRecordsByDate(selectedDate),
       fetchStatsByDate(selectedDate),
     ]);
@@ -182,8 +188,9 @@ export const DashboardScreen: React.FC = () => {
   };
 
   const handleAddRecord = async () => {
-    if (!selectedWorker || !selectedActivity || !achievedPerformance || !startTime || !endTime || !block) {
-      showToast('Por favor completa todos los campos requeridos', 'error');
+    setAddAttempted(true);
+    if (hasAddErrors) {
+      showToast('Completa todos los campos requeridos', 'error');
       return;
     }
 
@@ -211,16 +218,9 @@ export const DashboardScreen: React.FC = () => {
       }
     }
 
-    // Determinar el expectedPerformance a usar:
-    // - Si es HOY: usar siempre la meta actual de la actividad
-    // - Si es otro día: mantener la meta del registro existente
-    const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-    const existingRecordWithActivity = selectedDateRecords.find(
-      r => r.activityId === selectedActivity && !r.isDeleted
-    );
-    const expectedPerformanceToUse = isToday 
-      ? activity.expectedPerformance 
-      : (existingRecordWithActivity?.expectedPerformance || activity.expectedPerformance);
+    // Determinar el expectedPerformance usando el historial de metas
+    const dateWeekStart = format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const expectedPerformanceToUse = ActivityRepository.getPerformanceForWeek(activity, dateWeekStart);
 
     const shift = {
       startTime,
@@ -260,7 +260,23 @@ export const DashboardScreen: React.FC = () => {
     setBlock('');
     setNotes('');
     setEditingRecord(null);
+    setAddAttempted(false);
   };
+
+  // Validación en tiempo real del formulario de crear registro
+  const addErrors = useMemo(() => {
+    const errors: { worker?: string; activity?: string; startTime?: string; endTime?: string; performance?: string; block?: string } = {};
+    if (!selectedWorker) errors.worker = 'Requerido';
+    if (!selectedActivity) errors.activity = 'Requerido';
+    if (!startTime) errors.startTime = 'Requerido';
+    if (!endTime) errors.endTime = 'Requerido';
+    if (startTime && endTime && calculateHours(startTime, endTime) <= 0) errors.endTime = 'Debe ser mayor al inicio';
+    if (!achievedPerformance || parseFloat(achievedPerformance) <= 0) errors.performance = 'Requerido';
+    if (!block) errors.block = 'Selecciona un bloque';
+    return errors;
+  }, [selectedWorker, selectedActivity, startTime, endTime, achievedPerformance, block]);
+
+  const hasAddErrors = Object.keys(addErrors).length > 0;
 
   const handleEditRecord = (record: any) => {
     setEditingRecord(record);
@@ -288,6 +304,27 @@ export const DashboardScreen: React.FC = () => {
     const newShifts = editingShifts.filter((_, i) => i !== index);
     setEditingShifts(newShifts);
   };
+
+  // Validación en tiempo real de los turnos en edición
+  const editShiftValidation = useMemo(() => {
+    return editingShifts.map((shift: any) => {
+      const errors: { startTime?: string; endTime?: string; block?: string; achievedPerformance?: string } = {};
+      if (!shift.startTime) errors.startTime = 'Requerido';
+      if (!shift.endTime) errors.endTime = 'Requerido';
+      if (shift.startTime && shift.endTime && calculateHours(shift.startTime, shift.endTime) <= 0) {
+        errors.endTime = 'Debe ser mayor al inicio';
+      }
+      if (!shift.block || !blockNames.includes(shift.block)) {
+        errors.block = !shift.block ? 'Requerido' : 'Bloque inactivo, selecciona uno activo';
+      }
+      if (!shift.achievedPerformance || parseFloat(shift.achievedPerformance.toString()) <= 0) {
+        errors.achievedPerformance = 'Requerido';
+      }
+      return errors;
+    });
+  }, [editingShifts, blockNames]);
+
+  const hasEditErrors = editShiftValidation.some(e => Object.keys(e).length > 0);
 
   const handleUpdateRecord = async () => {
     if (!editingRecord) {
@@ -334,7 +371,7 @@ export const DashboardScreen: React.FC = () => {
     const shiftsWithNumbers = editingShifts.map(s => ({
       startTime: s.startTime,
       endTime: s.endTime,
-      block: s.block || undefined,
+      block: s.block,
       achievedPerformance: parseFloat(s.achievedPerformance.toString()) || 0,
     }));
     const totalAchieved = shiftsWithNumbers.reduce((sum, s) => sum + s.achievedPerformance, 0);
@@ -557,6 +594,7 @@ export const DashboardScreen: React.FC = () => {
           options={workers.map(w => ({ label: w.name, value: w.id }))}
           value={selectedWorker}
           onChange={setSelectedWorker}
+          error={addAttempted ? addErrors.worker : undefined}
         />
 
         <Select
@@ -568,12 +606,13 @@ export const DashboardScreen: React.FC = () => {
           }))}
           value={selectedActivity}
           onChange={setSelectedActivity}
+          error={addAttempted ? addErrors.activity : undefined}
         />
 
         {selectedActivityData && (
           <View style={styles.metaInfo}>
             <Text style={styles.metaText}>
-              Meta: {selectedActivityData.expectedPerformance} {selectedActivityData.unit}/hora
+              Meta: {ActivityRepository.getPerformanceForWeek(selectedActivityData, format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd'))} {selectedActivityData.unit}/hora
             </Text>
           </View>
         )}
@@ -585,6 +624,7 @@ export const DashboardScreen: React.FC = () => {
               placeholder="08:00"
               value={startTime}
               onChange={setStartTime}
+              error={addAttempted ? addErrors.startTime : undefined}
             />
           </View>
           <View style={styles.timeInput}>
@@ -599,6 +639,7 @@ export const DashboardScreen: React.FC = () => {
                 }
                 setEndTime(time);
               }}
+              error={addAttempted ? addErrors.endTime : undefined}
             />
           </View>
         </View>
@@ -617,11 +658,12 @@ export const DashboardScreen: React.FC = () => {
           keyboardType="decimal-pad"
           value={achievedPerformance}
           onChangeText={(value) => setAchievedPerformance(value.replace(',', '.'))}
+          error={addAttempted ? addErrors.performance : undefined}
         />
 
         <Text style={styles.blockSelectorLabel}>Bloque</Text>
         <View style={styles.blockSelectorRow}>
-          {['21', '17', '16', '15', '10'].map(b => (
+          {blockNames.map(b => (
             <TouchableOpacity
               key={b}
               style={[styles.blockBtn, block === b && styles.blockBtnActive]}
@@ -631,6 +673,9 @@ export const DashboardScreen: React.FC = () => {
             </TouchableOpacity>
           ))}
         </View>
+        {addAttempted && addErrors.block && (
+          <Text style={styles.blockErrorText}>{addErrors.block}</Text>
+        )}
 
         <Input
           label="Notas (opcional)"
@@ -695,6 +740,7 @@ export const DashboardScreen: React.FC = () => {
                     placeholder="08:00"
                     value={shift.startTime}
                     onChange={(value) => handleUpdateShift(index, 'startTime', value)}
+                    error={editShiftValidation[index]?.startTime}
                   />
                 </View>
                 <View style={styles.editShiftTimeField}>
@@ -703,24 +749,21 @@ export const DashboardScreen: React.FC = () => {
                     placeholder="17:00"
                     value={shift.endTime}
                     onChange={(value) => handleUpdateShift(index, 'endTime', value)}
+                    error={editShiftValidation[index]?.endTime}
                   />
                 </View>
               </View>
               
               <View style={styles.editShiftTimeRow}>
                 <View style={styles.editShiftTimeField}>
-                  <Text style={styles.blockSelectorLabel}>Bloque</Text>
-                  <View style={styles.blockSelectorRow}>
-                    {['21', '17', '16', '15', '10'].map(b => (
-                      <TouchableOpacity
-                        key={b}
-                        style={[styles.blockBtnSmall, shift.block === b && styles.blockBtnActive]}
-                        onPress={() => handleUpdateShift(index, 'block', shift.block === b ? '' : b)}
-                      >
-                        <Text style={[styles.blockBtnTextSmall, shift.block === b && styles.blockBtnTextActive]}>{b}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                  <Select
+                    label="Bloque"
+                    placeholder="Seleccionar bloque"
+                    options={blockNames.map(b => ({ label: b, value: b }))}
+                    value={shift.block && blockNames.includes(shift.block) ? shift.block : ''}
+                    onChange={(value) => handleUpdateShift(index, 'block', value)}
+                    error={editShiftValidation[index]?.block}
+                  />
                 </View>
                 <View style={styles.editShiftTimeField}>
                   <Input
@@ -729,6 +772,7 @@ export const DashboardScreen: React.FC = () => {
                     keyboardType="decimal-pad"
                     value={shift.achievedPerformance.toString()}
                     onChangeText={(value) => handleUpdateShift(index, 'achievedPerformance', value.replace(',', '.'))}
+                    error={editShiftValidation[index]?.achievedPerformance}
                   />
                 </View>
               </View>
@@ -749,6 +793,7 @@ export const DashboardScreen: React.FC = () => {
           title="Guardar Cambios"
           onPress={handleUpdateRecord}
           loading={isLoading}
+          disabled={hasEditErrors}
         />
 
         <TouchableOpacity
@@ -1327,20 +1372,26 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   deleteRecordText: {
-    fontSize: 15,
-    fontWeight: '600',
     color: colors.danger,
+    fontWeight: '500',
+    fontSize: 14,
   },
   blockSelectorLabel: {
-    fontSize: 14,
     fontWeight: '500',
     color: colors.text,
     marginBottom: 8,
+  },
+  blockErrorText: {
+    fontSize: 12,
+    color: colors.danger,
+    marginTop: -12,
+    marginBottom: 12,
   },
   blockSelectorRow: {
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
+    flexWrap: 'wrap',
   },
   blockBtn: {
     flex: 1,

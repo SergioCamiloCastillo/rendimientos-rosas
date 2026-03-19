@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '../theme';
-import { usePerformanceStore, useWorkerStore, useActivityStore } from '../../store';
+import { usePerformanceStore, useWorkerStore, useActivityStore, useBlockStore } from '../../store';
 import { exportToExcel, exportByActivity, exportByWorker, exportWeeklyReport, exportWorkPlan, WEEKLY_SUMMARY_FIELDS, WEEKLY_DETAIL_FIELDS } from '../../utils/excelExport';
 import { useToast } from '../context/ToastContext';
 import { PerformanceRepository } from '../../data/repositories';
@@ -25,6 +25,7 @@ export const ExportScreen: React.FC = () => {
   const { showToast } = useToast();
   const { workers, fetchWorkers } = useWorkerStore();
   const { activities, fetchActivities } = useActivityStore();
+  const { blocks: blockList, fetchBlocks } = useBlockStore();
   const [exporting, setExporting] = useState(false);
   
   // Filtros de fecha
@@ -46,6 +47,7 @@ export const ExportScreen: React.FC = () => {
   useEffect(() => {
     fetchWorkers();
     fetchActivities();
+    fetchBlocks();
   }, []);
 
   const getFilteredRecords = async () => {
@@ -236,11 +238,7 @@ export const ExportScreen: React.FC = () => {
             placeholder="Todos los bloques"
             options={[
               { label: 'Todos los bloques', value: '' },
-              { label: 'Bloque 21', value: '21' },
-              { label: 'Bloque 17', value: '17' },
-              { label: 'Bloque 16', value: '16' },
-              { label: 'Bloque 15', value: '15' },
-              { label: 'Bloque 10', value: '10' },
+              ...blockList.map(b => ({ label: `Bloque ${b.name}`, value: b.name })),
             ]}
             value={selectedBlock}
             onChange={setSelectedBlock}
@@ -287,32 +285,6 @@ export const ExportScreen: React.FC = () => {
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
 
-          {/* Todos los registros - siempre disponible */}
-          <TouchableOpacity 
-            style={styles.exportOption}
-            onPress={() => handleExport('all')}
-            activeOpacity={0.7}
-            disabled={exporting}
-          >
-            <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
-              <MaterialIcons name="description" size={24} color={colors.primary} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>
-                {selectedWorker || selectedActivity ? 'Registros filtrados' : 'Todos los registros'}
-              </Text>
-              <Text style={styles.optionSubtitle}>
-                {selectedWorker && selectedActivity 
-                  ? 'Datos del trabajador y actividad seleccionados'
-                  : selectedWorker 
-                    ? 'Datos del trabajador seleccionado'
-                    : selectedActivity 
-                      ? 'Datos de la actividad seleccionada'
-                      : 'Exportar todos los datos en una hoja'}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
 
           {/* Por Actividad - solo si no hay actividad específica seleccionada */}
           {!selectedActivity && (

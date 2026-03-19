@@ -9,6 +9,7 @@ import { AsyncStorageAdapter, STORAGE_KEYS } from '../../infrastructure/storage/
 import { WorkerRepository } from './WorkerRepository';
 import { ActivityRepository } from './ActivityRepository';
 import uuid from 'react-native-uuid';
+import { format, startOfWeek } from 'date-fns';
 
 export interface PerformanceFilters {
   workerId?: string;
@@ -46,12 +47,17 @@ export class PerformanceRepository {
         }, 0);
       }
       
-      // Si es hoy, actualizar expectedPerformance con el valor actual de la actividad
+      // Usar la meta histórica correcta según la semana del registro
       let expectedPerformance = record.expectedPerformance;
-      if (record.date === today && !record.isDeleted) {
+      if (!record.isDeleted) {
         const activity = activities.find(a => a.id === record.activityId);
-        if (activity && activity.expectedPerformance !== record.expectedPerformance) {
-          expectedPerformance = activity.expectedPerformance;
+        if (activity) {
+          const recordDate = new Date(record.date + 'T12:00:00');
+          const recordWeekStart = format(startOfWeek(recordDate, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+          const historicalPerformance = ActivityRepository.getPerformanceForWeek(activity, recordWeekStart);
+          if (historicalPerformance !== record.expectedPerformance) {
+            expectedPerformance = historicalPerformance;
+          }
         }
       }
       

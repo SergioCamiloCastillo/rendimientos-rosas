@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,192 +11,171 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 import { Button, Input, BottomSheet, ListItem, EmptyState, Sidebar, MenuButton } from '../components';
-import { useWorkerStore } from '../../store';
-import { Worker } from '../../domain/entities';
+import { useBlockStore } from '../../store';
+import { Block } from '../../domain/entities';
 import { useToast } from '../context/ToastContext';
 
-export const WorkersScreen: React.FC = () => {
+export const BlocksScreen: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAddWorker, setShowAddWorker] = useState(false);
-  const [showEditWorker, setShowEditWorker] = useState(false);
+  const [showAddBlock, setShowAddBlock] = useState(false);
+  const [showEditBlock, setShowEditBlock] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
-  const [selectedWorker, setSelectedWorker] = useState<Worker | null>(null);
-  
-  const [code, setCode] = useState('');
+  const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
+
   const [name, setName] = useState('');
-  const [position, setPosition] = useState('');
-  const [attempted, setAttempted] = useState(false);
   const { showToast } = useToast();
 
   const {
-    workers,
-    inactiveWorkers,
+    blocks,
+    inactiveBlocks,
     isLoading,
-    fetchWorkers,
-    fetchInactiveWorkers,
-    addWorker,
-    updateWorker,
-    deactivateWorker,
-    restoreWorker,
-    permanentDeleteWorker,
-  } = useWorkerStore();
+    fetchBlocks,
+    fetchInactiveBlocks,
+    addBlock,
+    updateBlock,
+    deactivateBlock,
+    restoreBlock,
+    permanentDeleteBlock,
+  } = useBlockStore();
 
   useEffect(() => {
-    fetchWorkers();
-    fetchInactiveWorkers();
+    fetchBlocks();
+    fetchInactiveBlocks();
   }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchWorkers(), fetchInactiveWorkers()]);
+    await Promise.all([fetchBlocks(), fetchInactiveBlocks()]);
     setRefreshing(false);
   };
 
   const resetForm = () => {
-    setCode('');
     setName('');
-    setPosition('');
-    setSelectedWorker(null);
-    setAttempted(false);
+    setSelectedBlock(null);
   };
 
-  const formErrors = useMemo(() => {
-    const errors: { code?: string; name?: string } = {};
-    if (!code.trim()) errors.code = 'Requerido';
-    if (!name.trim()) errors.name = 'Requerido';
-    return errors;
-  }, [code, name]);
+  const handleAddBlock = async () => {
+    if (!name.trim()) {
+      showToast('El nombre del bloque es requerido', 'warning');
+      return;
+    }
 
-  const hasFormErrors = Object.keys(formErrors).length > 0;
-
-  const handleAddWorker = async () => {
-    setAttempted(true);
-    if (hasFormErrors) {
-      showToast('Completa todos los campos requeridos', 'warning');
+    const exists = blocks.some(b => b.name.toLowerCase() === name.trim().toLowerCase());
+    if (exists) {
+      showToast('Ya existe un bloque con ese nombre', 'warning');
       return;
     }
 
     try {
-      await addWorker({
-        code: code.trim(),
-        name: name.trim(),
-        identification: '',
-        position: position.trim() || undefined,
-      });
+      await addBlock({ name: name.trim() });
       resetForm();
-      setShowAddWorker(false);
-      showToast('Trabajador agregado correctamente', 'success');
-    } catch (error: any) {
-      const message = error?.message || 'No se pudo agregar el trabajador';
-      showToast(message, 'error');
+      setShowAddBlock(false);
+      showToast('Bloque agregado correctamente', 'success');
+    } catch (error) {
+      showToast('No se pudo agregar el bloque', 'error');
     }
   };
 
-  const handleEditWorker = async () => {
-    setAttempted(true);
-    if (!selectedWorker || hasFormErrors) {
-      showToast('Completa todos los campos requeridos', 'warning');
+  const handleEditBlock = async () => {
+    if (!selectedBlock || !name.trim()) {
+      showToast('El nombre del bloque es requerido', 'warning');
+      return;
+    }
+
+    const exists = blocks.some(
+      b => b.id !== selectedBlock.id && b.name.toLowerCase() === name.trim().toLowerCase()
+    );
+    if (exists) {
+      showToast('Ya existe un bloque con ese nombre', 'warning');
       return;
     }
 
     try {
-      await updateWorker(selectedWorker.id, {
-        code: code.trim(),
-        name: name.trim(),
-        identification: '',
-        position: position.trim() || undefined,
-      });
+      await updateBlock(selectedBlock.id, { name: name.trim() });
       resetForm();
-      setShowEditWorker(false);
-      showToast('Trabajador actualizado correctamente', 'success');
-    } catch (error: any) {
-      const message = error?.message || 'No se pudo actualizar el trabajador';
-      showToast(message, 'error');
+      setShowEditBlock(false);
+      showToast('Bloque actualizado correctamente', 'success');
+    } catch (error) {
+      showToast('No se pudo actualizar el bloque', 'error');
     }
   };
 
-  const handleDeactivate = (worker: Worker) => {
+  const handleDeactivate = (block: Block) => {
     Alert.alert(
-      'Desactivar Trabajador',
-      `¿Deseas desactivar a ${worker.name}? Podrás restaurarlo desde el historial.`,
+      'Desactivar Bloque',
+      `¿Deseas desactivar el bloque "${block.name}"? Podrás restaurarlo desde el historial.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Desactivar',
           style: 'destructive',
-          onPress: () => deactivateWorker(worker.id),
+          onPress: () => deactivateBlock(block.id),
         },
       ]
     );
   };
 
-  const handleRestore = (worker: Worker) => {
+  const handleRestore = (block: Block) => {
     Alert.alert(
-      'Restaurar Trabajador',
-      `¿Deseas restaurar a ${worker.name}?`,
+      'Restaurar Bloque',
+      `¿Deseas restaurar el bloque "${block.name}"?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Restaurar',
-          onPress: () => restoreWorker(worker.id),
+          onPress: () => restoreBlock(block.id),
         },
       ]
     );
   };
 
-  const handlePermanentDelete = (worker: Worker) => {
+  const handlePermanentDelete = (block: Block) => {
     Alert.alert(
       'Eliminar Permanentemente',
-      `¿Estás seguro de eliminar permanentemente a ${worker.name}? Esta acción no se puede deshacer.`,
+      `¿Estás seguro de eliminar permanentemente el bloque "${block.name}"? Esta acción no se puede deshacer.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => permanentDeleteWorker(worker.id),
+          onPress: () => permanentDeleteBlock(block.id),
         },
       ]
     );
   };
 
-  const openEditWorker = (worker: Worker) => {
-    setSelectedWorker(worker);
-    setCode(worker.code);
-    setName(worker.name);
-    setPosition(worker.position || '');
-    setShowEditWorker(true);
+  const openEditBlock = (block: Block) => {
+    setSelectedBlock(block);
+    setName(block.name);
+    setShowEditBlock(true);
   };
 
-  const renderWorkerItem = ({ item }: { item: Worker }) => (
+  const renderBlockItem = ({ item }: { item: Block }) => (
     <ListItem
-      title={item.name}
-      subtitle={item.code ? `${item.code} • ${item.position || 'Sin cargo asignado'}` : (item.position || 'Sin cargo asignado')}
+      title={`Bloque ${item.name}`}
+      subtitle={`Creado: ${new Date(item.createdAt).toLocaleDateString('es')}`}
       leftIcon={
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {item.name.charAt(0).toUpperCase()}
-          </Text>
+        <View style={styles.iconContainer}>
+          <Text style={styles.icon}>📦</Text>
         </View>
       }
       rightIcon={
         <Text style={styles.chevron}>›</Text>
       }
-      onPress={() => openEditWorker(item)}
+      onPress={() => openEditBlock(item)}
       onLongPress={() => handleDeactivate(item)}
     />
   );
 
-  const renderInactiveWorkerItem = ({ item }: { item: Worker }) => (
+  const renderInactiveBlockItem = ({ item }: { item: Block }) => (
     <ListItem
-      title={item.name}
-      subtitle={item.position || 'Sin cargo'}
+      title={`Bloque ${item.name}`}
+      subtitle={`Creado: ${new Date(item.createdAt).toLocaleDateString('es')}`}
       backgroundColor={colors.gray[100]}
       leftIcon={
-        <View style={[styles.avatar, styles.avatarInactive]}>
-          <Text style={[styles.avatarText, styles.avatarTextInactive]}>
-            {item.name.charAt(0).toUpperCase()}
-          </Text>
+        <View style={[styles.iconContainer, styles.iconInactive]}>
+          <Text style={styles.icon}>📦</Text>
         </View>
       }
       rightIcon={
@@ -222,7 +201,7 @@ export const WorkersScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <MenuButton onPress={() => setShowMenu(true)} />
-        <Text style={styles.title}>Trabajadores</Text>
+        <Text style={styles.title}>Bloques</Text>
         <View style={{ width: 32 }} />
       </View>
 
@@ -234,7 +213,7 @@ export const WorkersScreen: React.FC = () => {
           onPress={() => setShowInactive(false)}
         >
           <Text style={[styles.tabText, !showInactive && styles.tabTextActive]}>
-            Activos ({workers.length})
+            Activos ({blocks.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -242,32 +221,32 @@ export const WorkersScreen: React.FC = () => {
           onPress={() => setShowInactive(true)}
         >
           <Text style={[styles.tabText, showInactive && styles.tabTextActive]}>
-            Historial ({inactiveWorkers.length})
+            Historial ({inactiveBlocks.length})
           </Text>
         </TouchableOpacity>
       </View>
 
       {!showInactive ? (
         <FlatList
-          data={workers}
+          data={blocks}
           keyExtractor={item => item.id}
-          renderItem={renderWorkerItem}
+          renderItem={renderBlockItem}
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl refreshing={refreshing === true} onRefresh={onRefresh} />
           }
           ListEmptyComponent={
             <EmptyState
-              title="No hay trabajadores"
-              message="Agrega trabajadores para comenzar a registrar rendimientos"
+              title="No hay bloques"
+              message="Agrega bloques para organizar tus rendimientos"
             />
           }
         />
       ) : (
         <FlatList
-          data={inactiveWorkers}
+          data={inactiveBlocks}
           keyExtractor={item => item.id}
-          renderItem={renderInactiveWorkerItem}
+          renderItem={renderInactiveBlockItem}
           contentContainerStyle={styles.list}
           refreshControl={
             <RefreshControl refreshing={refreshing === true} onRefresh={onRefresh} />
@@ -275,7 +254,7 @@ export const WorkersScreen: React.FC = () => {
           ListEmptyComponent={
             <EmptyState
               title="No hay historial"
-              message="Los trabajadores desactivados aparecerán aquí"
+              message="Los bloques desactivados aparecerán aquí"
             />
           }
         />
@@ -284,84 +263,61 @@ export const WorkersScreen: React.FC = () => {
       {!showInactive && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => setShowAddWorker(true)}
+          onPress={() => setShowAddBlock(true)}
         >
           <Text style={styles.fabText}>+</Text>
         </TouchableOpacity>
       )}
 
-      <BottomSheet visible={showAddWorker} onClose={() => { setShowAddWorker(false); resetForm(); }}>
-        <Text style={styles.sheetTitle}>Nuevo Trabajador</Text>
-        
-        <Input
-          label="Código"
-          placeholder="Ej: 001"
-          value={code}
-          onChangeText={(text) => setCode(text.replace(/[^0-9]/g, ''))}
-          keyboardType="numeric"
-          error={attempted ? formErrors.code : undefined}
-        />
+      <BottomSheet visible={showAddBlock} onClose={() => { setShowAddBlock(false); resetForm(); }}>
+        <Text style={styles.sheetTitle}>Nuevo Bloque</Text>
 
         <Input
-          label="Nombre completo"
+          label="Nombre del bloque"
+          placeholder="Ej: 21, 17, 10"
+          keyboardType="number-pad"
           value={name}
           onChangeText={setName}
-          error={attempted ? formErrors.name : undefined}
         />
 
-        <Input
-          label="Cargo (opcional)"
-          placeholder="Ej: Operaria"
-          value={position}
-          onChangeText={setPosition}
-        />
+        <View style={styles.helpText}>
+          <Text style={styles.helpTextContent}>
+            💡 Los bloques se usan para organizar las metas semanales y registros de rendimiento
+          </Text>
+        </View>
 
         <Button
-          title="Agregar Trabajador"
-          onPress={handleAddWorker}
+          title="Agregar Bloque"
+          onPress={handleAddBlock}
           loading={isLoading}
         />
       </BottomSheet>
 
-      <BottomSheet visible={showEditWorker} onClose={() => { setShowEditWorker(false); resetForm(); }}>
-        <Text style={styles.sheetTitle}>Editar Trabajador</Text>
-        
-        <Input
-          label="Código"
-          placeholder="Ej: 001"
-          value={code}
-          onChangeText={(text) => setCode(text.replace(/[^0-9]/g, ''))}
-          keyboardType="numeric"
-          error={attempted ? formErrors.code : undefined}
-        />
+      <BottomSheet visible={showEditBlock} onClose={() => { setShowEditBlock(false); resetForm(); }}>
+        <Text style={styles.sheetTitle}>Editar Bloque</Text>
 
         <Input
-          label="Nombre completo"
+          label="Nombre del bloque"
+          placeholder="Ej: 21, 17, 10"
+          keyboardType="number-pad"
           value={name}
           onChangeText={setName}
-          error={attempted ? formErrors.name : undefined}
-        />
-
-        <Input
-          label="Cargo (opcional)"
-          value={position}
-          onChangeText={setPosition}
         />
 
         <Button
           title="Guardar Cambios"
-          onPress={handleEditWorker}
+          onPress={handleEditBlock}
           loading={isLoading}
         />
 
         <View style={styles.deleteSection}>
           <Button
-            title="Desactivar Trabajador"
+            title="Desactivar Bloque"
             variant="danger"
             onPress={() => {
-              if (selectedWorker) {
-                setShowEditWorker(false);
-                handleDeactivate(selectedWorker);
+              if (selectedBlock) {
+                setShowEditBlock(false);
+                handleDeactivate(selectedBlock);
               }
             }}
           />
@@ -388,17 +344,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     color: colors.text,
-  },
-  historyButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  historyIcon: {
-    fontSize: 20,
   },
   tabs: {
     flexDirection: 'row',
@@ -427,24 +372,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 100,
   },
-  avatar: {
+  iconContainer: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 12,
     backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  avatarInactive: {
+  iconInactive: {
     backgroundColor: colors.gray[200],
   },
-  avatarText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  avatarTextInactive: {
-    color: colors.textSecondary,
+  icon: {
+    fontSize: 20,
   },
   chevron: {
     fontSize: 24,
@@ -495,6 +435,16 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 24,
     textAlign: 'center',
+  },
+  helpText: {
+    backgroundColor: colors.primaryLight,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  helpTextContent: {
+    color: colors.primary,
+    fontSize: 14,
   },
   deleteSection: {
     marginTop: 16,

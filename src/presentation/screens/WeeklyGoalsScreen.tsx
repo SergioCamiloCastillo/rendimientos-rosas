@@ -14,7 +14,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme';
 import { Sidebar, MenuButton, BottomSheet, Select, Input, Button } from '../components';
-import { useActivityStore, useWeeklyGoalStore } from '../../store';
+import { useActivityStore, useWeeklyGoalStore, useBlockStore } from '../../store';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '../context/ToastContext';
@@ -26,10 +26,6 @@ export const WeeklyGoalsScreen: React.FC = () => {
   const [showEditGoal, setShowEditGoal] = useState(false);
   const [editingGoalId, setEditingGoalId] = useState('');
   const [selectedActivity, setSelectedActivity] = useState('');
-  const BLOCKS = ['21', '17', '16', '15', '10'];
-  const [blockGoals, setBlockGoals] = useState<Record<string, string>>(
-    Object.fromEntries(BLOCKS.map(b => [b, '']))
-  );
   const [editBlock, setEditBlock] = useState('');
   const [editGoalAmount, setEditGoalAmount] = useState('');
   const [editActivityName, setEditActivityName] = useState('');
@@ -40,6 +36,9 @@ export const WeeklyGoalsScreen: React.FC = () => {
 
   const { activities, fetchActivities } = useActivityStore();
   const { goals, fetchGoals, addGoalForBlocks, updateGoal, deleteGoal, setSelectedWeekStart, isLoading } = useWeeklyGoalStore();
+  const { blocks: blockList, fetchBlocks } = useBlockStore();
+  const BLOCKS = blockList.map(b => b.name);
+  const [blockGoals, setBlockGoals] = useState<Record<string, string>>({});
   const { showToast } = useToast();
 
   const weekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
@@ -47,7 +46,12 @@ export const WeeklyGoalsScreen: React.FC = () => {
 
   useEffect(() => {
     fetchActivities();
+    fetchBlocks();
   }, []);
+
+  useEffect(() => {
+    setBlockGoals(Object.fromEntries(BLOCKS.map(b => [b, ''])));
+  }, [blockList]);
 
   useEffect(() => {
     setSelectedWeekStart(weekStartStr);
@@ -85,8 +89,8 @@ export const WeeklyGoalsScreen: React.FC = () => {
 
     // Recoger bloques con meta válida
     const entries = BLOCKS
-      .filter(b => blockGoals[b].trim() !== '')
-      .map(b => ({ block: b, amount: parseFloat(blockGoals[b]) }));
+      .filter(b => (blockGoals[b] || '').trim() !== '')
+      .map(b => ({ block: b, amount: parseFloat(blockGoals[b] || '0') }));
 
     if (entries.length === 0) {
       showToast('Ingresa la meta en al menos un bloque', 'warning');
@@ -109,7 +113,7 @@ export const WeeklyGoalsScreen: React.FC = () => {
       }
       showToast(`Meta agregada para ${entries.length} bloque(s)`, 'success');
       setSelectedActivity('');
-      setBlockGoals(Object.fromEntries(BLOCKS.map(b => [b, ''])));
+      setBlockGoals(prev => Object.fromEntries(BLOCKS.map(b => [b, ''])));
       setShowAddGoal(false);
     } catch {
       showToast('Error al agregar la meta', 'error');
@@ -215,7 +219,7 @@ export const WeeklyGoalsScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          goals.map((item) => (
+          [...goals].sort((a, b) => (a.block || '').localeCompare(b.block || '')).map((item) => (
             <View key={item.id} style={styles.progressCard}>
               <View style={styles.cardHeader}>
                 <View style={{ flex: 1 }}>
@@ -303,7 +307,7 @@ export const WeeklyGoalsScreen: React.FC = () => {
               <View key={`input-${b}`} style={styles.gridCell}>
                 <TextInput
                   style={styles.gridInput}
-                  value={blockGoals[b]}
+                  value={blockGoals[b] || ''}
                   onChangeText={(v) => updateBlockGoal(b, v)}
                   keyboardType="decimal-pad"
                   placeholder="0"
@@ -320,7 +324,7 @@ export const WeeklyGoalsScreen: React.FC = () => {
         </Text>
 
         <Button
-          title={`Agregar Meta (${BLOCKS.filter(b => blockGoals[b].trim() !== '').length} bloques)`}
+          title={`Agregar Meta (${BLOCKS.filter(b => (blockGoals[b] || '').trim() !== '').length} bloques)`}
           onPress={handleAddGoal}
           loading={isLoading}
         />

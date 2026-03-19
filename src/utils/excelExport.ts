@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import XLSX from 'xlsx-js-style';
 import { PerformanceRecordWithDetails } from '../domain/entities';
-import { WeeklyGoalRepository, PerformanceRepository, ActivityRepository, AbsenceRepository } from '../data/repositories';
+import { WeeklyGoalRepository, PerformanceRepository, ActivityRepository, AbsenceRepository, BlockRepository } from '../data/repositories';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -494,9 +494,9 @@ export async function exportWeeklyReport(
 }
 
 // Exportar reporte Plan de Trabajo por bloque
-const BLOCKS = ['21', '17', '16', '15', '10'];
-
 export async function exportWorkPlan(date: string): Promise<void> {
+  const BLOCKS = await BlockRepository.getActiveNames();
+
   const dateObj = new Date(date + 'T12:00:00');
   const weekStart = format(startOfWeek(dateObj, { weekStartsOn: 1 }), 'yyyy-MM-dd');
   const weekEnd = format(endOfWeek(dateObj, { weekStartsOn: 1 }), 'yyyy-MM-dd');

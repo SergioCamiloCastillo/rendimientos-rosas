@@ -13,7 +13,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
 import { PerformanceCard, BottomSheet, Select, Button, EmptyState, Sidebar, MenuButton, Input } from '../components';
-import { useWorkerStore, useActivityStore, usePerformanceStore } from '../../store';
+import { useWorkerStore, useActivityStore, usePerformanceStore, useBlockStore } from '../../store';
 import { exportToExcel, exportByActivity, exportByWorker } from '../../utils/excelExport';
 import { format, subDays, startOfWeek, startOfMonth } from 'date-fns';
 
@@ -33,6 +33,7 @@ export const RecordsScreen: React.FC = () => {
   const [filterMetGoal, setFilterMetGoal] = useState<string>('');
 
   const { workers, fetchWorkers } = useWorkerStore();
+  const { blocks: blockList, fetchBlocks } = useBlockStore();
   const { activities, fetchActivities } = useActivityStore();
   const { 
     records, 
@@ -49,6 +50,7 @@ export const RecordsScreen: React.FC = () => {
   useEffect(() => {
     fetchWorkers();
     fetchActivities();
+    fetchBlocks();
     fetchRecords();
     fetchStats();
   }, []);
@@ -288,11 +290,15 @@ export const RecordsScreen: React.FC = () => {
           onChange={setFilterActivity}
         />
 
-        <Input
+        <Select
           label="Bloque"
-          placeholder="Ej: A1, B2, Lote 3..."
+          placeholder="Todos los bloques"
+          options={[
+            { label: 'Todos los bloques', value: '' },
+            ...blockList.map(b => ({ label: `Bloque ${b.name}`, value: b.name })),
+          ]}
           value={filterBlock}
-          onChangeText={setFilterBlock}
+          onChange={setFilterBlock}
         />
 
         <Select

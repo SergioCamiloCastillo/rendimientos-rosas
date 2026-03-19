@@ -7,6 +7,7 @@ interface TimePickerProps {
   value: string;
   onChange: (time: string) => void;
   placeholder?: string;
+  error?: string;
 }
 
 export const TimePicker: React.FC<TimePickerProps> = ({
@@ -14,6 +15,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
   value,
   onChange,
   placeholder = 'Seleccionar hora',
+  error,
 }) => {
   const [showModal, setShowModal] = useState(false);
   const [hours, setHours] = useState('');
@@ -120,7 +122,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity style={styles.input} onPress={handlePress}>
+      <TouchableOpacity style={[styles.input, error && styles.inputError]} onPress={handlePress}>
         <Text style={[styles.inputText, !value && styles.placeholder]}>
           {value ? formatTimeDisplay(value) : placeholder}
         </Text>
@@ -192,6 +194,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
           </View>
         </View>
       </Modal>
+      {error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 };
@@ -214,6 +217,14 @@ const styles = StyleSheet.create({
     padding: 16,
     minHeight: 56,
     justifyContent: 'center',
+  },
+  inputError: {
+    borderColor: colors.danger,
+  },
+  errorText: {
+    fontSize: 12,
+    color: colors.danger,
+    marginTop: 4,
   },
   inputText: {
     fontSize: 16,

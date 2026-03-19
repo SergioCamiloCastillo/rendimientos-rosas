@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   Alert,
   RefreshControl,
@@ -13,6 +14,9 @@ import { colors } from '../theme';
 import { Button, Input, BottomSheet, ListItem, EmptyState, Sidebar, MenuButton } from '../components';
 import { useActivityStore } from '../../store';
 import { Activity } from '../../domain/entities';
+import { ActivityRepository } from '../../data/repositories';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useToast } from '../context/ToastContext';
 
 export const ActivitiesScreen: React.FC = () => {
@@ -20,13 +24,15 @@ export const ActivitiesScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showAddActivity, setShowAddActivity] = useState(false);
   const [showEditActivity, setShowEditActivity] = useState(false);
-  const [showInactive, setShowInactive] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'inactive' | 'history'>('active');
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [unit, setUnit] = useState('');
   const [expectedPerformance, setExpectedPerformance] = useState('');
+  const [attempted, setAttempted] = useState(false);
+  const [performanceLockedThisWeek, setPerformanceLockedThisWeek] = useState(false);
   const { showToast } = useToast();
 
   const {
@@ -59,19 +65,40 @@ export const ActivitiesScreen: React.FC = () => {
     setUnit('');
     setExpectedPerformance('');
     setSelectedActivity(null);
+    setAttempted(false);
+    setPerformanceLockedThisWeek(false);
   };
 
+  const formErrors = useMemo(() => {
+    const errors: { name?: string; unit?: string; performance?: string } = {};
+    if (!name.trim()) errors.name = 'Requerido';
+    if (!unit.trim()) errors.unit = 'Requerido';
+    if (!expectedPerformance || isNaN(parseFloat(expectedPerformance)) || parseFloat(expectedPerformance) <= 0) {
+      errors.performance = 'Debe ser un número positivo';
+    }
+    return errors;
+  }, [name, unit, expectedPerformance]);
+
+  const hasFormErrors = Object.keys(formErrors).length > 0;
+
+  const hasEditChanges = useMemo(() => {
+    if (!selectedActivity) return false;
+    return (
+      name.trim() !== selectedActivity.name ||
+      (description.trim() || '') !== (selectedActivity.description || '') ||
+      unit.trim() !== selectedActivity.unit ||
+      expectedPerformance !== selectedActivity.expectedPerformance.toString()
+    );
+  }, [selectedActivity, name, description, unit, expectedPerformance]);
+
   const handleAddActivity = async () => {
-    if (!name.trim() || !unit.trim() || !expectedPerformance) {
-      showToast('El nombre, unidad y meta son requeridos', 'warning');
+    setAttempted(true);
+    if (hasFormErrors) {
+      showToast('Completa todos los campos requeridos', 'warning');
       return;
     }
 
     const performance = parseFloat(expectedPerformance);
-    if (isNaN(performance) || performance <= 0) {
-      showToast('La meta debe ser un número positivo', 'warning');
-      return;
-    }
 
     try {
       await addActivity({
@@ -89,16 +116,13 @@ export const ActivitiesScreen: React.FC = () => {
   };
 
   const handleEditActivity = async () => {
-    if (!selectedActivity || !name.trim() || !unit.trim() || !expectedPerformance) {
-      showToast('El nombre, unidad y meta son requeridos', 'warning');
+    setAttempted(true);
+    if (!selectedActivity || hasFormErrors) {
+      showToast('Completa todos los campos requeridos', 'warning');
       return;
     }
 
     const performance = parseFloat(expectedPerformance);
-    if (isNaN(performance) || performance <= 0) {
-      showToast('La meta debe ser un número positivo', 'warning');
-      return;
-    }
 
     try {
       await updateActivity(selectedActivity.id, {
@@ -110,8 +134,9 @@ export const ActivitiesScreen: React.FC = () => {
       resetForm();
       setShowEditActivity(false);
       showToast('Actividad actualizada correctamente', 'success');
-    } catch (error) {
-      showToast('No se pudo actualizar la actividad', 'error');
+    } catch (error: any) {
+      const message = error?.message || 'No se pudo actualizar la actividad';
+      showToast(message, 'error');
     }
   };
 
@@ -165,6 +190,7 @@ export const ActivitiesScreen: React.FC = () => {
     setDescription(activity.description || '');
     setUnit(activity.unit);
     setExpectedPerformance(activity.expectedPerformance.toString());
+    setPerformanceLockedThisWeek(ActivityRepository.wasPerformanceChangedThisWeek(activity));
     setShowEditActivity(true);
   };
 
@@ -237,24 +263,32 @@ export const ActivitiesScreen: React.FC = () => {
 
       <View style={styles.tabs}>
         <TouchableOpacity
-          style={[styles.tab, !showInactive && styles.tabActive]}
-          onPress={() => setShowInactive(false)}
+          style={[styles.tab, activeTab === 'active' && styles.tabActive]}
+          onPress={() => setActiveTab('active')}
         >
-          <Text style={[styles.tabText, !showInactive && styles.tabTextActive]}>
+          <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextActive]}>
             Activas ({activities.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, showInactive && styles.tabActive]}
-          onPress={() => setShowInactive(true)}
+          style={[styles.tab, activeTab === 'inactive' && styles.tabActive]}
+          onPress={() => setActiveTab('inactive')}
         >
-          <Text style={[styles.tabText, showInactive && styles.tabTextActive]}>
-            Historial ({inactiveActivities.length})
+          <Text style={[styles.tabText, activeTab === 'inactive' && styles.tabTextActive]}>
+            Desactivadas ({inactiveActivities.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'history' && styles.tabActive]}
+          onPress={() => setActiveTab('history')}
+        >
+          <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>
+            Historial
           </Text>
         </TouchableOpacity>
       </View>
 
-      {!showInactive ? (
+      {activeTab === 'active' && (
         <FlatList
           data={activities}
           keyExtractor={item => item.id}
@@ -270,7 +304,9 @@ export const ActivitiesScreen: React.FC = () => {
             />
           }
         />
-      ) : (
+      )}
+
+      {activeTab === 'inactive' && (
         <FlatList
           data={inactiveActivities}
           keyExtractor={item => item.id}
@@ -281,14 +317,79 @@ export const ActivitiesScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <EmptyState
-              title="No hay historial"
+              title="No hay desactivadas"
               message="Las actividades desactivadas aparecerán aquí"
             />
           }
         />
       )}
 
-      {!showInactive && (
+      {activeTab === 'history' && (
+        <ScrollView
+          contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl refreshing={refreshing === true} onRefresh={onRefresh} />
+          }
+        >
+          {[...activities, ...inactiveActivities].filter(a => a.performanceHistory && a.performanceHistory.length > 0).length === 0 ? (
+            <EmptyState
+              title="Sin cambios registrados"
+              message="Aquí aparecerán los cambios de meta de las actividades"
+            />
+          ) : (
+            [...activities, ...inactiveActivities]
+              .filter(a => a.performanceHistory && a.performanceHistory.length > 0)
+              .sort((a, b) => {
+                const lastA = [...(a.performanceHistory || [])].sort((x, y) => y.changedAt.localeCompare(x.changedAt))[0];
+                const lastB = [...(b.performanceHistory || [])].sort((x, y) => y.changedAt.localeCompare(x.changedAt))[0];
+                return (lastB?.changedAt || '').localeCompare(lastA?.changedAt || '');
+              })
+              .map(activity => (
+                <View key={activity.id} style={styles.historyCard}>
+                  <View style={styles.historyCardHeader}>
+                    <Text style={styles.historyCardTitle}>{activity.name}</Text>
+                    <Text style={styles.historyCardSubtitle}>
+                      Meta actual: {activity.expectedPerformance} {activity.unit}
+                    </Text>
+                  </View>
+                  {[...(activity.performanceHistory || [])]
+                    .sort((a, b) => b.changedAt.localeCompare(a.changedAt))
+                    .map((entry, idx) => {
+                      const changeDate = new Date(entry.changedAt);
+                      return (
+                        <View key={idx} style={styles.historyEntry}>
+                          <View style={styles.historyEntryDot} />
+                          <View style={styles.historyEntryContent}>
+                            <Text style={styles.historyEntryDate}>
+                              {format(changeDate, "d 'de' MMMM yyyy, h:mm a", { locale: es })}
+                            </Text>
+                            <Text style={styles.historyEntryText}>
+                              Semana del {entry.weekStart}
+                            </Text>
+                            <View style={styles.historyEntryValues}>
+                              {entry.previousPerformance != null && (
+                                <>
+                                  <Text style={styles.historyEntryOld}>
+                                    {entry.previousPerformance} {activity.unit}
+                                  </Text>
+                                  <Text style={styles.historyEntryArrow}>→</Text>
+                                </>
+                              )}
+                              <Text style={styles.historyEntryNew}>
+                                {entry.expectedPerformance} {activity.unit}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                </View>
+              ))
+          )}
+        </ScrollView>
+      )}
+
+      {activeTab === 'active' && (
         <TouchableOpacity
           style={styles.fab}
           onPress={() => setShowAddActivity(true)}
@@ -305,6 +406,7 @@ export const ActivitiesScreen: React.FC = () => {
           placeholder="Ej: Corte de tallos"
           value={name}
           onChangeText={setName}
+          error={attempted ? formErrors.name : undefined}
         />
 
         <Input
@@ -320,6 +422,7 @@ export const ActivitiesScreen: React.FC = () => {
           placeholder="Ej: tallos/hora, camas, plantas"
           value={unit}
           onChangeText={setUnit}
+          error={attempted ? formErrors.unit : undefined}
         />
 
         <Input
@@ -327,6 +430,7 @@ export const ActivitiesScreen: React.FC = () => {
           value={expectedPerformance}
           onChangeText={(value) => setExpectedPerformance(value.replace(',', '.'))}
           keyboardType="decimal-pad"
+          error={attempted ? formErrors.performance : undefined}
         />
 
         <View style={styles.helpText}>
@@ -350,6 +454,7 @@ export const ActivitiesScreen: React.FC = () => {
           placeholder="Ej: Corte de tallos"
           value={name}
           onChangeText={setName}
+          error={attempted ? formErrors.name : undefined}
         />
 
         <Input
@@ -364,6 +469,7 @@ export const ActivitiesScreen: React.FC = () => {
           placeholder="Ej: tallos/hora, camas, plantas"
           value={unit}
           onChangeText={setUnit}
+          error={attempted ? formErrors.unit : undefined}
         />
 
         <Input
@@ -372,12 +478,17 @@ export const ActivitiesScreen: React.FC = () => {
           value={expectedPerformance}
           onChangeText={(value) => setExpectedPerformance(value.replace(',', '.'))}
           keyboardType="decimal-pad"
+          editable={!performanceLockedThisWeek}
+          error={performanceLockedThisWeek 
+            ? 'La meta ya fue modificada esta semana' 
+            : (attempted ? formErrors.performance : undefined)}
         />
 
         <Button
           title="Guardar Cambios"
           onPress={handleEditActivity}
           loading={isLoading}
+          disabled={!hasEditChanges}
         />
 
         <View style={styles.deleteSection}>
@@ -532,5 +643,75 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  historyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  historyCardHeader: {
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  historyCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  historyCardSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  historyEntry: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  historyEntryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+    marginTop: 6,
+    marginRight: 12,
+  },
+  historyEntryContent: {
+    flex: 1,
+  },
+  historyEntryDate: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.text,
+  },
+  historyEntryText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  historyEntryValues: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 6,
+  },
+  historyEntryOld: {
+    fontSize: 14,
+    color: colors.danger,
+    textDecorationLine: 'line-through',
+  },
+  historyEntryArrow: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  historyEntryNew: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.success,
   },
 });

@@ -65,11 +65,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose }) => {
                 icon={() => <MaterialIcons name="assignment" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Activities')}
               />
+               <PaperDrawer.Item
+                label="Bloques"
+                icon={() => <MaterialIcons name="grid-view" size={24} color={colors.primary} />}
+                onPress={() => navigateTo('Blocks')}
+              />
               <PaperDrawer.Item
                 label="Historial"
                 icon={() => <MaterialIcons name="history" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Records')}
               />
+              
               <PaperDrawer.Item
                 label="Estadísticas"
                 icon={() => <MaterialIcons name="bar-chart" size={24} color={colors.primary} />}
@@ -90,6 +96,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose }) => {
                 icon={() => <MaterialIcons name="event-busy" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Absences')}
               />
+             
             </List.Accordion>
           </ScrollView>
         </View>

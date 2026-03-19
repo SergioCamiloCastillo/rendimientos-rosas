@@ -45,4 +45,5 @@ export const STORAGE_KEYS = {
   PERFORMANCE_RECORDS: '@rendimientos/performance_records',
   ABSENCES: '@rendimientos/absences',
   WEEKLY_GOALS: '@rendimientos/weekly_goals',
+  BLOCKS: '@rendimientos/blocks',
 } as const;
