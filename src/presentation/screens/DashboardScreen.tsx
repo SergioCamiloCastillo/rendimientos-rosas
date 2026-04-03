@@ -34,15 +34,22 @@ export const DashboardScreen: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<any>(null);
   
   const [selectedWorker, setSelectedWorker] = useState('');
-  const [selectedActivity, setSelectedActivity] = useState('');
-  const [achievedPerformance, setAchievedPerformance] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
   const [block, setBlock] = useState('');
   const [notes, setNotes] = useState('');
   const [editingShifts, setEditingShifts] = useState<any[]>([]);
   const [shiftErrors, setShiftErrors] = useState<number[]>([]);
   const [addAttempted, setAddAttempted] = useState(false);
+
+  // Estado para múltiples turnos en "Nuevo Registro"
+  interface NewShiftEntry {
+    activityId: string;
+    startTime: string;
+    endTime: string;
+    achievedPerformance: string;
+  }
+  const emptyShift: NewShiftEntry = { activityId: '', startTime: '', endTime: '', achievedPerformance: '' };
+  const [newShifts, setNewShifts] = useState<NewShiftEntry[]>([{ ...emptyShift }]);
+  const [newShiftErrors, setNewShiftErrors] = useState<number[]>([]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const { showToast } = useToast();
@@ -187,65 +194,175 @@ export const DashboardScreen: React.FC = () => {
     return false;
   };
 
-  const handleAddRecord = async () => {
-    setAddAttempted(true);
-    if (hasAddErrors) {
-      showToast('Completa todos los campos requeridos', 'error');
-      return;
+  // --- Helpers para manejar los turnos en "Nuevo Registro" ---
+  const handleUpdateNewShift = (index: number, field: keyof NewShiftEntry, value: string) => {
+    const updated = [...newShifts];
+    updated[index] = { ...updated[index], [field]: value };
+    setNewShifts(updated);
+    // Limpiar errores cuando el usuario modifica
+    if (newShiftErrors.includes(index)) {
+      setNewShiftErrors(newShiftErrors.filter(i => i !== index));
     }
+  };
 
-    const activity = activities.find(a => a.id === selectedActivity);
-    if (!activity) return;
+  const handleAddNewShift = () => {
+    setNewShifts([...newShifts, { ...emptyShift }]);
+  };
 
-    const hours = calculateHours(startTime, endTime);
-    if (hours <= 0) {
-      showToast('La hora de fin debe ser mayor a la hora de inicio', 'error');
-      return;
-    }
+  const handleRemoveNewShift = (index: number) => {
+    setNewShifts(newShifts.filter((_, i) => i !== index));
+  };
 
-    // Verificar si ya existe un registro para este trabajador y actividad en la fecha
-    const existingRecord = selectedDateRecords.find(
-      r => r.workerId === selectedWorker && 
-           r.activityId === selectedActivity &&
-           !r.isDeleted
-    );
+  // Helper: verificar si un turno está completamente vacío
+  const isShiftEmpty = (shift: NewShiftEntry): boolean => {
+    return !shift.activityId && !shift.startTime && !shift.endTime && !shift.achievedPerformance;
+  };
 
-    // Si existe, verificar solapamiento de horarios
-    if (existingRecord && existingRecord.shifts && existingRecord.shifts.length > 0) {
-      if (checkTimeOverlap(startTime, endTime, existingRecord.shifts)) {
-        showToast('Este horario se solapa con un turno ya registrado', 'error');
-        return;
+  // Helper: verificar si un turno tiene al menos algún dato
+  const isShiftPartiallyFilled = (shift: NewShiftEntry): boolean => {
+    return !isShiftEmpty(shift);
+  };
+
+  // Validación en tiempo real de cada turno en "Nuevo Registro"
+  // Solo valida turnos que tienen al menos algún dato
+  const newShiftValidation = useMemo(() => {
+    return newShifts.map((shift) => {
+      // Si el turno está completamente vacío, no mostrar errores
+      if (isShiftEmpty(shift)) return {};
+      const errors: { activityId?: string; startTime?: string; endTime?: string; achievedPerformance?: string } = {};
+      if (!shift.activityId) errors.activityId = 'Requerido';
+      if (!shift.startTime) errors.startTime = 'Requerido';
+      if (!shift.endTime) errors.endTime = 'Requerido';
+      if (shift.startTime && shift.endTime && calculateHours(shift.startTime, shift.endTime) <= 0) {
+        errors.endTime = 'Debe ser mayor al inicio';
+      }
+      if (!shift.achievedPerformance || parseFloat(shift.achievedPerformance) <= 0) {
+        errors.achievedPerformance = 'Requerido';
+      }
+      return errors;
+    });
+  }, [newShifts]);
+
+  // Detección de solapamiento en tiempo real entre turnos
+  const newShiftOverlaps = useMemo(() => {
+    const overlapping = new Set<number>();
+    const filledShifts = newShifts.map((s, i) => ({ ...s, index: i })).filter(s => s.startTime && s.endTime);
+    for (let i = 0; i < filledShifts.length; i++) {
+      for (let j = i + 1; j < filledShifts.length; j++) {
+        if (checkTimeOverlap(filledShifts[i].startTime, filledShifts[i].endTime, [{ startTime: filledShifts[j].startTime, endTime: filledShifts[j].endTime }])) {
+          overlapping.add(filledShifts[i].index);
+          overlapping.add(filledShifts[j].index);
+        }
       }
     }
+    return overlapping;
+  }, [newShifts]);
 
-    // Determinar el expectedPerformance usando el historial de metas
+  const addWorkerError = useMemo(() => {
+    if (!selectedWorker) return 'Requerido';
+    return undefined;
+  }, [selectedWorker]);
+
+  const addBlockError = useMemo(() => {
+    if (!block) return 'Selecciona un bloque';
+    return undefined;
+  }, [block]);
+
+  // Solo contar errores de turnos que no están vacíos
+  const filledShiftsExist = newShifts.some(s => isShiftPartiallyFilled(s));
+  const hasAddErrors = !!addWorkerError || !!addBlockError || !filledShiftsExist || 
+    newShiftValidation.some(e => Object.keys(e).length > 0) || newShiftOverlaps.size > 0;
+
+  const handleAddRecord = async () => {
+    setAddAttempted(true);
+
+    // Filtrar turnos vacíos
+    const filledShifts = newShifts.filter(s => isShiftPartiallyFilled(s));
+
+    if (!selectedWorker || !block) {
+      showToast('Selecciona un trabajador y un bloque', 'error');
+      return;
+    }
+
+    if (filledShifts.length === 0) {
+      showToast('Agrega al menos un turno con datos', 'error');
+      return;
+    }
+
+    // Validar que los turnos con datos estén completos
+    const filledIndices = newShifts.map((s, i) => isShiftPartiallyFilled(s) ? i : -1).filter(i => i >= 0);
+    const hasFieldErrors = filledIndices.some(i => Object.keys(newShiftValidation[i]).length > 0);
+    if (hasFieldErrors) {
+      showToast('Completa todos los campos de los turnos', 'error');
+      return;
+    }
+
+    // Verificar solapamiento
+    if (newShiftOverlaps.size > 0) {
+      showToast('Los horarios no pueden solaparse entre turnos', 'error');
+      return;
+    }
+
+    // Agrupar turnos con datos por activityId
+    const groupedByActivity: Record<string, NewShiftEntry[]> = {};
+    for (const shift of filledShifts) {
+      if (!groupedByActivity[shift.activityId]) {
+        groupedByActivity[shift.activityId] = [];
+      }
+      groupedByActivity[shift.activityId].push(shift);
+    }
+
     const dateWeekStart = format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-    const expectedPerformanceToUse = ActivityRepository.getPerformanceForWeek(activity, dateWeekStart);
-
-    const shift = {
-      startTime,
-      endTime,
-      block: block || undefined,
-      achievedPerformance: parseFloat(achievedPerformance),
-    };
 
     try {
-      await addRecord({
-        workerId: selectedWorker,
-        activityId: selectedActivity,
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        achievedPerformance: parseFloat(achievedPerformance),
-        expectedPerformance: expectedPerformanceToUse,
-        shifts: [shift],
-        totalHours: hours,
-        notes: notes || undefined,
-      });
-      
+      // Crear un PerformanceRecord por cada actividad
+      for (const [activityId, shifts] of Object.entries(groupedByActivity)) {
+        const activity = activities.find(a => a.id === activityId);
+        if (!activity) continue;
+
+        const expectedPerformanceToUse = ActivityRepository.getPerformanceForWeek(activity, dateWeekStart);
+
+        // Verificar solapamiento con turnos existentes
+        const existingRecord = selectedDateRecords.find(
+          r => r.workerId === selectedWorker && r.activityId === activityId && !r.isDeleted
+        );
+        if (existingRecord && existingRecord.shifts && existingRecord.shifts.length > 0) {
+          for (const s of shifts) {
+            if (checkTimeOverlap(s.startTime, s.endTime, existingRecord.shifts)) {
+              showToast(`Horario de "${activity.name}" se solapa con turno existente`, 'error');
+              return;
+            }
+          }
+        }
+
+        const shiftsData = shifts.map(s => ({
+          startTime: s.startTime,
+          endTime: s.endTime,
+          block: block || undefined,
+          achievedPerformance: parseFloat(s.achievedPerformance),
+        }));
+
+        const totalAchieved = shiftsData.reduce((sum, s) => sum + s.achievedPerformance, 0);
+        const totalHours = shiftsData.reduce((sum, s) => sum + calculateHours(s.startTime, s.endTime), 0);
+
+        await addRecord({
+          workerId: selectedWorker,
+          activityId,
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          achievedPerformance: totalAchieved,
+          expectedPerformance: expectedPerformanceToUse,
+          shifts: shiftsData,
+          totalHours,
+          notes: notes || undefined,
+        });
+      }
+
       resetForm();
       setShowAddRecord(false);
       await fetchRecordsByDate(selectedDate);
       await fetchStatsByDate(selectedDate);
-      showToast('Registro agregado correctamente', 'success');
+      const count = Object.keys(groupedByActivity).length;
+      showToast(count > 1 ? `${count} registros agregados correctamente` : 'Registro agregado correctamente', 'success');
     } catch (error) {
       showToast('No se pudo agregar el registro', 'error');
     }
@@ -253,37 +370,17 @@ export const DashboardScreen: React.FC = () => {
 
   const resetForm = () => {
     setSelectedWorker('');
-    setSelectedActivity('');
-    setAchievedPerformance('');
-    setStartTime('');
-    setEndTime('');
     setBlock('');
+    setNewShifts([{ ...emptyShift }]);
+    setNewShiftErrors([]);
     setNotes('');
     setEditingRecord(null);
     setAddAttempted(false);
   };
 
-  // Validación en tiempo real del formulario de crear registro
-  const addErrors = useMemo(() => {
-    const errors: { worker?: string; activity?: string; startTime?: string; endTime?: string; performance?: string; block?: string } = {};
-    if (!selectedWorker) errors.worker = 'Requerido';
-    if (!selectedActivity) errors.activity = 'Requerido';
-    if (!startTime) errors.startTime = 'Requerido';
-    if (!endTime) errors.endTime = 'Requerido';
-    if (startTime && endTime && calculateHours(startTime, endTime) <= 0) errors.endTime = 'Debe ser mayor al inicio';
-    if (!achievedPerformance || parseFloat(achievedPerformance) <= 0) errors.performance = 'Requerido';
-    if (!block) errors.block = 'Selecciona un bloque';
-    return errors;
-  }, [selectedWorker, selectedActivity, startTime, endTime, achievedPerformance, block]);
-
-  const hasAddErrors = Object.keys(addErrors).length > 0;
-
   const handleEditRecord = (record: any) => {
     setEditingRecord(record);
     setSelectedWorker(record.workerId);
-    setSelectedActivity(record.activityId);
-    setAchievedPerformance(record.achievedPerformance.toString());
-    setBlock(record.block || '');
     setNotes(record.notes || '');
     setEditingShifts(record.shifts ? [...record.shifts] : []);
     setShiftErrors([]);
@@ -291,9 +388,9 @@ export const DashboardScreen: React.FC = () => {
   };
 
   const handleUpdateShift = (index: number, field: string, value: any) => {
-    const newShifts = [...editingShifts];
-    newShifts[index] = { ...newShifts[index], [field]: value };
-    setEditingShifts(newShifts);
+    const updatedEditShifts = [...editingShifts];
+    updatedEditShifts[index] = { ...updatedEditShifts[index], [field]: value };
+    setEditingShifts(updatedEditShifts);
     // Limpiar errores cuando el usuario modifica un turno
     if (shiftErrors.includes(index)) {
       setShiftErrors(shiftErrors.filter(i => i !== index));
@@ -301,8 +398,8 @@ export const DashboardScreen: React.FC = () => {
   };
 
   const handleDeleteShift = (index: number) => {
-    const newShifts = editingShifts.filter((_, i) => i !== index);
-    setEditingShifts(newShifts);
+    const remainingShifts = editingShifts.filter((_, i) => i !== index);
+    setEditingShifts(remainingShifts);
   };
 
   // Validación en tiempo real de los turnos en edición
@@ -417,7 +514,7 @@ export const DashboardScreen: React.FC = () => {
     );
   };
 
-  const selectedActivityData = activities.find(a => a.id === selectedActivity);
+  // selectedActivityData se calcula per-shift en el formulario de nuevo registro
 
   const [showMenu, setShowMenu] = useState(false);
   const navigation = useNavigation();
@@ -594,71 +691,7 @@ export const DashboardScreen: React.FC = () => {
           options={workers.map(w => ({ label: w.name, value: w.id }))}
           value={selectedWorker}
           onChange={setSelectedWorker}
-          error={addAttempted ? addErrors.worker : undefined}
-        />
-
-        <Select
-          label="Actividad"
-          placeholder="Seleccionar actividad"
-          options={activities.map(a => ({ 
-            label: `${a.name} (Meta: ${a.expectedPerformance} ${a.unit})`, 
-            value: a.id 
-          }))}
-          value={selectedActivity}
-          onChange={setSelectedActivity}
-          error={addAttempted ? addErrors.activity : undefined}
-        />
-
-        {selectedActivityData && (
-          <View style={styles.metaInfo}>
-            <Text style={styles.metaText}>
-              Meta: {ActivityRepository.getPerformanceForWeek(selectedActivityData, format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd'))} {selectedActivityData.unit}/hora
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.timeRow}>
-          <View style={styles.timeInput}>
-            <TimePicker
-              label="Hora Inicio"
-              placeholder="08:00"
-              value={startTime}
-              onChange={setStartTime}
-              error={addAttempted ? addErrors.startTime : undefined}
-            />
-          </View>
-          <View style={styles.timeInput}>
-            <TimePicker
-              label="Hora Fin"
-              placeholder="17:00"
-              value={endTime}
-              onChange={(time) => {
-                if (startTime && calculateHours(startTime, time) <= 0) {
-                  showToast('La hora fin debe ser mayor a la hora inicio', 'error');
-                  return;
-                }
-                setEndTime(time);
-              }}
-              error={addAttempted ? addErrors.endTime : undefined}
-            />
-          </View>
-        </View>
-
-        {startTime && endTime && calculateHours(startTime, endTime) > 0 && (
-          <View style={styles.hoursInfo}>
-            <Text style={styles.hoursText}>
-              Horas trabajadas: {calculateHours(startTime, endTime).toFixed(1)}h
-            </Text>
-          </View>
-        )}
-
-        <Input
-          label="Rendimiento Logrado"
-          placeholder="Ej: 150"
-          keyboardType="decimal-pad"
-          value={achievedPerformance}
-          onChangeText={(value) => setAchievedPerformance(value.replace(',', '.'))}
-          error={addAttempted ? addErrors.performance : undefined}
+          error={addAttempted ? addWorkerError : undefined}
         />
 
         <Text style={styles.blockSelectorLabel}>Bloque</Text>
@@ -673,8 +706,117 @@ export const DashboardScreen: React.FC = () => {
             </TouchableOpacity>
           ))}
         </View>
-        {addAttempted && addErrors.block && (
-          <Text style={styles.blockErrorText}>{addErrors.block}</Text>
+        {addAttempted && addBlockError && (
+          <Text style={styles.blockErrorText}>{addBlockError}</Text>
+        )}
+
+        {selectedWorker !== '' && block !== '' && (
+          <>
+            <Text style={styles.editSectionTitle}>Turnos</Text>
+            {newShifts.map((shift, index) => {
+              const shiftActivityData = activities.find(a => a.id === shift.activityId);
+              const shiftHours = (shift.startTime && shift.endTime) ? calculateHours(shift.startTime, shift.endTime) : 0;
+              const hasOverlap = newShiftOverlaps.has(index);
+              const showFieldErrors = addAttempted && isShiftPartiallyFilled(shift);
+              return (
+                <View key={index} style={[styles.editShiftCard, hasOverlap && styles.editShiftCardError]}>
+                  <View style={styles.editShiftHeader}>
+                    <Text style={styles.editShiftLabel}>Turno {index + 1}</Text>
+                    {newShifts.length > 1 && (
+                      <TouchableOpacity
+                        onPress={() => handleRemoveNewShift(index)}
+                        style={styles.deleteShiftBtn}
+                      >
+                        <MaterialIcons name="close" size={20} color={colors.danger} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  <View style={styles.editShiftFields}>
+                    <Select
+                      label="Actividad"
+                      placeholder="Seleccionar actividad"
+                      options={activities.map(a => ({
+                        label: `${a.name} (${a.expectedPerformance} ${a.unit})`,
+                        value: a.id,
+                      }))}
+                      value={shift.activityId}
+                      onChange={(value) => handleUpdateNewShift(index, 'activityId', value)}
+                      error={showFieldErrors ? newShiftValidation[index]?.activityId : undefined}
+                    />
+
+                    {shiftActivityData && (
+                      <View style={styles.metaInfo}>
+                        <Text style={styles.metaText}>
+                          Meta: {ActivityRepository.getPerformanceForWeek(shiftActivityData, format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd'))} {shiftActivityData.unit}/hora
+                        </Text>
+                      </View>
+                    )}
+
+                    <View style={styles.editShiftTimeRow}>
+                      <View style={styles.editShiftTimeField}>
+                        <TimePicker
+                          label="Hora Inicio"
+                          placeholder="08:00"
+                          value={shift.startTime}
+                          onChange={(value) => handleUpdateNewShift(index, 'startTime', value)}
+                          error={showFieldErrors ? newShiftValidation[index]?.startTime : undefined}
+                        />
+                      </View>
+                      <View style={styles.editShiftTimeField}>
+                        <TimePicker
+                          label="Hora Fin"
+                          placeholder="17:00"
+                          value={shift.endTime}
+                          onChange={(value) => {
+                            if (shift.startTime && calculateHours(shift.startTime, value) <= 0) {
+                              showToast('La hora fin debe ser mayor a la hora inicio', 'error');
+                              return;
+                            }
+                            handleUpdateNewShift(index, 'endTime', value);
+                          }}
+                          error={showFieldErrors ? newShiftValidation[index]?.endTime : undefined}
+                        />
+                      </View>
+                    </View>
+
+                    {shiftHours > 0 && (
+                      <View style={styles.newShiftHoursInfo}>
+                        <Text style={styles.newShiftHoursText}>
+                          {shiftHours.toFixed(1)}h
+                        </Text>
+                      </View>
+                    )}
+
+                    <Input
+                      label="Rendimiento"
+                      placeholder="Ej: 150"
+                      keyboardType="decimal-pad"
+                      value={shift.achievedPerformance}
+                      onChangeText={(value) => handleUpdateNewShift(index, 'achievedPerformance', value.replace(',', '.'))}
+                      error={showFieldErrors ? newShiftValidation[index]?.achievedPerformance : undefined}
+                    />
+
+                    {hasOverlap && (
+                      <View style={styles.shiftOverlapError}>
+                        <MaterialIcons name="error-outline" size={16} color={colors.danger} />
+                        <Text style={styles.shiftOverlapErrorText}>El horario se superpone con otro turno</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+
+            <TouchableOpacity
+              style={styles.addShiftButton}
+              onPress={handleAddNewShift}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="add-circle-outline" size={22} color={colors.primary} />
+              <Text style={styles.addShiftButtonText}>Agregar otro turno</Text>
+            </TouchableOpacity>
+          </>
         )}
 
         <Input
@@ -687,9 +829,10 @@ export const DashboardScreen: React.FC = () => {
         />
 
         <Button
-          title="Guardar Registro"
+          title={newShifts.length > 1 ? `Guardar ${newShifts.length} Turnos` : 'Guardar Registro'}
           onPress={handleAddRecord}
           loading={isLoading}
+          disabled={selectedWorker === ''}
         />
       </BottomSheet>
 
@@ -1429,5 +1572,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.textSecondary,
+  },
+  addShiftButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: 12,
+    borderStyle: 'dashed',
+    backgroundColor: colors.primaryLight,
+  },
+  addShiftButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  newShiftHoursInfo: {
+    backgroundColor: colors.primaryLight,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: -4,
+  },
+  newShiftHoursText: {
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  shiftOverlapError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.dangerLight,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  shiftOverlapErrorText: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: '600',
+    flex: 1,
   },
 });

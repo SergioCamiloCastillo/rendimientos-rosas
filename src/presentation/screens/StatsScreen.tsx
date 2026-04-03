@@ -8,12 +8,16 @@ import {
   TouchableOpacity,
   Platform,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Line, Circle } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import ViewShot from 'react-native-view-shot';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { colors } from '../theme';
 import { Select, Sidebar, MenuButton } from '../components';
 import { PerformanceRepository, WorkerRepository } from '../../data/repositories';
@@ -54,6 +58,63 @@ export const StatsScreen: React.FC = () => {
   const [selectedWorkerId, setSelectedWorkerId] = useState<string>('');
   const [workerDailyStats, setWorkerDailyStats] = useState<DailyStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingPdf, setExportingPdf] = useState<string | null>(null);
+
+  // Refs para capturar las gráficas
+  const barChartRef = React.useRef<ViewShot | null>(null);
+  const trendChartRef = React.useRef<ViewShot | null>(null);
+  const workerChartRef = React.useRef<ViewShot | null>(null);
+
+  const captureChartAsBase64 = async (ref: React.RefObject<ViewShot | null>): Promise<string | null> => {
+    try {
+      if (!ref.current || !ref.current.capture) return null;
+      const base64 = await ref.current.capture();
+      return base64;
+    } catch (err) {
+      console.error('Error capturing chart:', err);
+      return null;
+    }
+  };
+
+  const generatePdfForChart = async (chartName: string, ref: React.RefObject<ViewShot | null>) => {
+    setExportingPdf(chartName);
+    try {
+      const base64 = await captureChartAsBase64(ref);
+      if (!base64) {
+        setExportingPdf(null);
+        return;
+      }
+
+      const dateRange = `${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`;
+      const html = `
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { font-family: -apple-system, sans-serif; padding: 32px; background: #fff; }
+              h1 { font-size: 24px; color: #1a1a1a; margin-bottom: 4px; }
+              .subtitle { font-size: 14px; color: #666; margin-bottom: 32px; }
+              h2 { font-size: 18px; color: #333; margin-bottom: 12px; }
+              img { width: 100%; border-radius: 12px; border: 1px solid #eee; }
+              .footer { text-align: center; font-size: 11px; color: #999; margin-top: 32px; }
+            </style>
+          </head>
+          <body>
+            <h1>${chartName}</h1>
+            <p class="subtitle">Período: ${dateRange}</p>
+            <img src="data:image/png;base64,${base64}" />
+            <p class="footer">Generado el ${format(new Date(), "d 'de' MMMM yyyy, HH:mm", { locale: es })}</p>
+          </body>
+        </html>
+      `;
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `${chartName}.pdf` });
+    } catch (err) {
+      console.error('Error generating PDF for chart:', err);
+    } finally {
+      setExportingPdf(null);
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -315,11 +376,24 @@ export const StatsScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <MaterialIcons name="bar-chart" size={20} color={colors.primary} />
-              <Text style={styles.sectionTitleWithIcon}>Rendimiento por Trabajador</Text>
+              <Text style={[styles.sectionTitleWithIcon, { flex: 1 }]}>Rendimiento por Trabajador</Text>
+              <TouchableOpacity
+                style={styles.pdfDownloadBtn}
+                onPress={() => generatePdfForChart('Rendimiento por Trabajador', barChartRef)}
+                disabled={exportingPdf !== null}
+              >
+                {exportingPdf === 'Rendimiento por Trabajador' ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <MaterialIcons name="picture-as-pdf" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
             </View>
+
+            {/* --- VISIBLE UI CHART (Scrollable) --- */}
             <View style={styles.chartContainer}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.verticalChartWrapper}>
+                <View style={[styles.verticalChartWrapper, { width: workerStats.length * (workerStats.length > 8 ? 35 : workerStats.length > 5 ? 42 : 50) + 40 }]}>
                   <View style={styles.verticalChartArea}>
                     <View style={[styles.goalLine, { bottom: `${(100 / 150) * 100}%` }]}>
                       <Text style={styles.goalLineLabel}>100%</Text>
@@ -328,14 +402,15 @@ export const StatsScreen: React.FC = () => {
                       {workerStats.map((worker) => {
                         const maxPct = 150;
                         const barHeight = Math.min((worker.avgPercentage / maxPct) * 100, 100);
-                        const barWidth = workerStats.length > 8 ? 16 : workerStats.length > 5 ? 20 : 24;
-                        const wrapperWidth = workerStats.length > 8 ? 35 : workerStats.length > 5 ? 42 : 50;
+                        const uiWrapperWidth = workerStats.length > 8 ? 35 : workerStats.length > 5 ? 42 : 50;
+                        const uiBarWidth = workerStats.length > 8 ? 16 : workerStats.length > 5 ? 20 : 24;
+                        
                         return (
-                          <View key={worker.id} style={[styles.verticalBarWrapper, { width: wrapperWidth }]}>
+                          <View key={worker.id} style={[styles.verticalBarWrapper, { width: uiWrapperWidth }]}>
                             <Text style={[styles.verticalBarValue, { color: getPercentageColor(worker.avgPercentage), fontSize: workerStats.length > 8 ? 8 : 10 }]}>
                               {worker.avgPercentage}%
                             </Text>
-                            <View style={[styles.verticalBarTrack, { width: barWidth }]}>
+                            <View style={[styles.verticalBarTrack, { width: uiBarWidth }]}>
                               <View 
                                 style={[
                                   styles.verticalBar,
@@ -347,7 +422,7 @@ export const StatsScreen: React.FC = () => {
                               />
                             </View>
                             <View style={styles.verticalBarLabelContainer}>
-                              <Text style={[styles.verticalBarLabelVertical, { fontSize: workerStats.length > 8 ? 7 : 9 }]}>
+                              <Text style={[styles.verticalBarLabelVertical, { fontSize: workerStats.length > 8 ? 7 : 9 }]} numberOfLines={2}>
                                 {worker.name}
                               </Text>
                             </View>
@@ -363,6 +438,59 @@ export const StatsScreen: React.FC = () => {
                 <Text style={styles.goalLineLegendText}>Meta 100%</Text>
               </View>
             </View>
+
+            {/* --- HIDDEN EXPORT CHART (Compressed to fit screen) --- */}
+            <View style={{ position: 'absolute', top: -10000, left: 0 }}>
+              <ViewShot ref={barChartRef} options={{ format: 'png', quality: 1, result: 'base64' }}>
+                <View style={[styles.chartContainer, { width: screenWidth - 40, backgroundColor: colors.surface }]}>
+                  <View style={[styles.verticalChartWrapper, { width: '100%', paddingRight: 10 }]}>
+                    <View style={styles.verticalChartArea}>
+                      <View style={[styles.goalLine, { bottom: `${(100 / 150) * 100}%` }]}>
+                        <Text style={styles.goalLineLabel}>100%</Text>
+                      </View>
+                      <View style={[styles.verticalBarsContainer, { justifyContent: 'space-around' }]}>
+                        {workerStats.map((worker) => {
+                          const maxPct = 150;
+                          const barHeight = Math.min((worker.avgPercentage / maxPct) * 100, 100);
+                          const contentWidth = screenWidth - 100;
+                          const exportWrapperWidth = Math.min(50, contentWidth / Math.max(1, workerStats.length));
+                          const exportBarWidth = Math.max(8, exportWrapperWidth * 0.45);
+                          
+                          return (
+                            <View key={worker.id} style={[styles.verticalBarWrapper, { width: exportWrapperWidth }]}>
+                              <Text style={[styles.verticalBarValue, { color: getPercentageColor(worker.avgPercentage), fontSize: workerStats.length > 8 ? 8 : 10 }]}>
+                                {worker.avgPercentage}%
+                              </Text>
+                              <View style={[styles.verticalBarTrack, { width: exportBarWidth }]}>
+                                <View 
+                                  style={[
+                                    styles.verticalBar,
+                                    { 
+                                      height: `${barHeight}%`,
+                                      backgroundColor: getPercentageColor(worker.avgPercentage),
+                                    }
+                                  ]} 
+                                />
+                              </View>
+                              <View style={styles.verticalBarLabelContainer}>
+                                <Text style={[styles.verticalBarLabelVertical, { fontSize: workerStats.length > 8 ? 7 : 9 }]} numberOfLines={2}>
+                                  {worker.name}
+                                </Text>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.goalLineLegend}>
+                    <View style={styles.goalLineLegendMark} />
+                    <Text style={styles.goalLineLegendText}>Meta 100%</Text>
+                  </View>
+                </View>
+              </ViewShot>
+            </View>
+
           </View>
         )}
 
@@ -371,8 +499,20 @@ export const StatsScreen: React.FC = () => {
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
               <MaterialIcons name="trending-up" size={20} color={colors.primary} />
-              <Text style={styles.sectionTitleWithIcon}>Tendencia de Rendimiento General</Text>
+              <Text style={[styles.sectionTitleWithIcon, { flex: 1 }]}>Tendencia de Rendimiento General</Text>
+              <TouchableOpacity
+                style={styles.pdfDownloadBtn}
+                onPress={() => generatePdfForChart('Tendencia de Rendimiento General', trendChartRef)}
+                disabled={exportingPdf !== null}
+              >
+                {exportingPdf === 'Tendencia de Rendimiento General' ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <MaterialIcons name="picture-as-pdf" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
             </View>
+            <ViewShot ref={trendChartRef} options={{ format: 'png', quality: 1, result: 'base64' }}>
             <View style={styles.chartContainer}>
               <View style={styles.svgChartWrapper}>
                 <View style={styles.simpleChartYAxis}>
@@ -451,6 +591,7 @@ export const StatsScreen: React.FC = () => {
                 </View>
               </View>
             </View>
+            </ViewShot>
           </View>
         )}
 
@@ -458,7 +599,23 @@ export const StatsScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionTitleRow}>
             <MaterialIcons name="person" size={20} color={colors.primary} />
-            <Text style={styles.sectionTitleWithIcon}>Tendencia Individual</Text>
+            <Text style={[styles.sectionTitleWithIcon, { flex: 1 }]}>Tendencia Individual</Text>
+            {selectedWorkerId && workerDailyStats.length > 0 && (
+              <TouchableOpacity
+                style={styles.pdfDownloadBtn}
+                onPress={() => generatePdfForChart(
+                  `Tendencia - ${activeWorkers.find(w => w.id === selectedWorkerId)?.name || 'Trabajador'}`,
+                  workerChartRef
+                )}
+                disabled={exportingPdf !== null}
+              >
+                {exportingPdf?.startsWith('Tendencia -') ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <MaterialIcons name="picture-as-pdf" size={20} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            )}
           </View>
           <View style={styles.workerSelectContainer}>
             <Select
@@ -477,6 +634,7 @@ export const StatsScreen: React.FC = () => {
           </View>
           
           {selectedWorkerId && workerDailyStats.length > 0 && (
+            <ViewShot ref={workerChartRef} options={{ format: 'png', quality: 1, result: 'base64' }}>
             <View style={styles.chartContainer}>
               <View style={styles.svgChartWrapper}>
                 <View style={styles.simpleChartYAxis}>
@@ -545,6 +703,7 @@ export const StatsScreen: React.FC = () => {
                 </View>
               </View>
             </View>
+            </ViewShot>
           )}
           
           {selectedWorkerId && workerDailyStats.length === 0 && (
@@ -1161,14 +1320,12 @@ const styles = StyleSheet.create({
   lineGraphLegend: {
     flexDirection: 'row',
     justifyContent: 'center',
+    marginTop: 16,
     gap: 16,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
   },
+
   verticalBarLabelContainer: {
-    height: 60,
+    height: 90,
     justifyContent: 'flex-start',
     alignItems: 'center',
     marginTop: 4,
@@ -1178,35 +1335,27 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '500',
     transform: [{ rotate: '-90deg' }],
-    width: 60,
+    width: 85,
     textAlign: 'right',
   },
   simpleChartWrapper: {
     flexDirection: 'row',
-    height: 160,
+    height: 180,
+    paddingTop: 10,
   },
   simpleChartYAxis: {
-    width: 40,
+    width: 35,
     justifyContent: 'space-between',
-    paddingVertical: 5,
+    paddingBottom: 24,
   },
   simpleChartYLabel: {
     fontSize: 10,
     color: colors.textSecondary,
-    textAlign: 'right',
   },
-  simpleChartArea: {
+  simpleChartBars: {
     flex: 1,
-    position: 'relative',
-    marginLeft: 8,
     borderLeftWidth: 1,
     borderBottomWidth: 1,
-    borderColor: colors.border,
-  },
-  simpleChartGoalLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
     height: 2,
     backgroundColor: '#1E40AF',
   },
@@ -1324,5 +1473,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     flex: 1,
+  },
+  pdfDownloadBtn: {
+    padding: 6,
+    backgroundColor: colors.primaryLight,
+    borderRadius: 8,
+    marginLeft: 8,
   },
 });

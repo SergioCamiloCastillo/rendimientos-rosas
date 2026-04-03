@@ -29,6 +29,7 @@ export class AbsenceRepository {
     if (existingIndex !== -1) {
       const updated: Absence = {
         ...absences[existingIndex],
+        entries: input.entries || [],
         peopleCount: input.peopleCount,
         hoursPerPerson: input.hoursPerPerson,
         hoursLost: input.hoursLost,
