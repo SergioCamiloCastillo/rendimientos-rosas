@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { LogBox } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -22,7 +23,16 @@ const queryClient = new QueryClient({
   },
 });
 
+SplashScreen.preventAutoHideAsync();
+
 export default function App() {
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      await SplashScreen.hideAsync();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <PaperProvider>
       <QueryClientProvider client={queryClient}>
