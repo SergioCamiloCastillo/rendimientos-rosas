@@ -34,8 +34,9 @@ export const DashboardScreen: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<any>(null);
   
   const [selectedWorker, setSelectedWorker] = useState('');
-  const [block, setBlock] = useState('');
+  const [filterWorker, setFilterWorker] = useState('');
   const [notes, setNotes] = useState('');
+  const [editingActivityId, setEditingActivityId] = useState('');
   const [editingShifts, setEditingShifts] = useState<any[]>([]);
   const [shiftErrors, setShiftErrors] = useState<number[]>([]);
   const [addAttempted, setAddAttempted] = useState(false);
@@ -46,8 +47,9 @@ export const DashboardScreen: React.FC = () => {
     startTime: string;
     endTime: string;
     achievedPerformance: string;
+    block: string;
   }
-  const emptyShift: NewShiftEntry = { activityId: '', startTime: '', endTime: '', achievedPerformance: '' };
+  const emptyShift: NewShiftEntry = { activityId: '', startTime: '', endTime: '', achievedPerformance: '', block: '' };
   const [newShifts, setNewShifts] = useState<NewShiftEntry[]>([{ ...emptyShift }]);
   const [newShiftErrors, setNewShiftErrors] = useState<number[]>([]);
 
@@ -131,17 +133,20 @@ export const DashboardScreen: React.FC = () => {
   const goToPreviousDay = () => {
     const newDate = subDays(selectedDate, 1);
     setSelectedDate(newDate);
+    setFilterWorker('');
   };
 
   const goToNextDay = () => {
     const newDate = addDays(selectedDate, 1);
     if (newDate <= new Date()) {
       setSelectedDate(newDate);
+      setFilterWorker('');
     }
   };
 
   const goToToday = () => {
     setSelectedDate(new Date());
+    setFilterWorker('');
   };
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
@@ -215,7 +220,7 @@ export const DashboardScreen: React.FC = () => {
 
   // Helper: verificar si un turno está completamente vacío
   const isShiftEmpty = (shift: NewShiftEntry): boolean => {
-    return !shift.activityId && !shift.startTime && !shift.endTime && !shift.achievedPerformance;
+    return !shift.activityId && !shift.startTime && !shift.endTime && !shift.achievedPerformance && !shift.block;
   };
 
   // Helper: verificar si un turno tiene al menos algún dato
@@ -229,8 +234,10 @@ export const DashboardScreen: React.FC = () => {
     return newShifts.map((shift) => {
       // Si el turno está completamente vacío, no mostrar errores
       if (isShiftEmpty(shift)) return {};
-      const errors: { activityId?: string; startTime?: string; endTime?: string; achievedPerformance?: string } = {};
+      const errors: { activityId?: string; startTime?: string; endTime?: string; achievedPerformance?: string; block?: string } = {};
       if (!shift.activityId) errors.activityId = 'Requerido';
+      if (!shift.block) errors.block = 'Requerido';
+      else if (!blockNames.includes(shift.block)) errors.block = 'Bloque inactivo';
       if (!shift.startTime) errors.startTime = 'Requerido';
       if (!shift.endTime) errors.endTime = 'Requerido';
       if (shift.startTime && shift.endTime && calculateHours(shift.startTime, shift.endTime) <= 0) {
@@ -241,7 +248,7 @@ export const DashboardScreen: React.FC = () => {
       }
       return errors;
     });
-  }, [newShifts]);
+  }, [newShifts, blockNames]);
 
   // Detección de solapamiento en tiempo real entre turnos
   const newShiftOverlaps = useMemo(() => {
@@ -263,14 +270,9 @@ export const DashboardScreen: React.FC = () => {
     return undefined;
   }, [selectedWorker]);
 
-  const addBlockError = useMemo(() => {
-    if (!block) return 'Selecciona un bloque';
-    return undefined;
-  }, [block]);
-
   // Solo contar errores de turnos que no están vacíos
   const filledShiftsExist = newShifts.some(s => isShiftPartiallyFilled(s));
-  const hasAddErrors = !!addWorkerError || !!addBlockError || !filledShiftsExist || 
+  const hasAddErrors = !!addWorkerError || !filledShiftsExist || 
     newShiftValidation.some(e => Object.keys(e).length > 0) || newShiftOverlaps.size > 0;
 
   const handleAddRecord = async () => {
@@ -279,8 +281,8 @@ export const DashboardScreen: React.FC = () => {
     // Filtrar turnos vacíos
     const filledShifts = newShifts.filter(s => isShiftPartiallyFilled(s));
 
-    if (!selectedWorker || !block) {
-      showToast('Selecciona un trabajador y un bloque', 'error');
+    if (!selectedWorker) {
+      showToast('Selecciona un trabajador', 'error');
       return;
     }
 
@@ -322,14 +324,15 @@ export const DashboardScreen: React.FC = () => {
 
         const expectedPerformanceToUse = ActivityRepository.getPerformanceForWeek(activity, dateWeekStart);
 
-        // Verificar solapamiento con turnos existentes
-        const existingRecord = selectedDateRecords.find(
-          r => r.workerId === selectedWorker && r.activityId === activityId && !r.isDeleted
+        // Verificar solapamiento con TODOS los turnos existentes del trabajador
+        const otherRecords = selectedDateRecords.filter(
+          r => r.workerId === selectedWorker && !r.isDeleted
         );
-        if (existingRecord && existingRecord.shifts && existingRecord.shifts.length > 0) {
+        for (const otherRecord of otherRecords) {
+          if (!otherRecord.shifts || otherRecord.shifts.length === 0) continue;
           for (const s of shifts) {
-            if (checkTimeOverlap(s.startTime, s.endTime, existingRecord.shifts)) {
-              showToast(`Horario de "${activity.name}" se solapa con turno existente`, 'error');
+            if (checkTimeOverlap(s.startTime, s.endTime, otherRecord.shifts)) {
+              showToast(`Horario de "${activity.name}" se solapa con "${otherRecord.activityName}"`, 'error');
               return;
             }
           }
@@ -338,7 +341,7 @@ export const DashboardScreen: React.FC = () => {
         const shiftsData = shifts.map(s => ({
           startTime: s.startTime,
           endTime: s.endTime,
-          block: block || undefined,
+          block: s.block || undefined,
           achievedPerformance: parseFloat(s.achievedPerformance),
         }));
 
@@ -370,7 +373,7 @@ export const DashboardScreen: React.FC = () => {
 
   const resetForm = () => {
     setSelectedWorker('');
-    setBlock('');
+    setEditingActivityId('');
     setNewShifts([{ ...emptyShift }]);
     setNewShiftErrors([]);
     setNotes('');
@@ -381,6 +384,7 @@ export const DashboardScreen: React.FC = () => {
   const handleEditRecord = (record: any) => {
     setEditingRecord(record);
     setSelectedWorker(record.workerId);
+    setEditingActivityId(record.activityId || '');
     setNotes(record.notes || '');
     setEditingShifts(record.shifts ? [...record.shifts] : []);
     setShiftErrors([]);
@@ -429,6 +433,11 @@ export const DashboardScreen: React.FC = () => {
       return;
     }
 
+    if (!editingActivityId) {
+      showToast('Debe seleccionar una actividad', 'error');
+      return;
+    }
+
     if (editingShifts.length === 0) {
       showToast('Debe haber al menos un turno', 'error');
       return;
@@ -464,6 +473,20 @@ export const DashboardScreen: React.FC = () => {
       return;
     }
 
+    // Validar que no haya solapamiento con turnos de otros registros del mismo trabajador
+    const otherRecords = selectedDateRecords.filter(
+      r => r.workerId === editingRecord.workerId && !r.isDeleted && r.id !== editingRecord.id
+    );
+    for (const otherRecord of otherRecords) {
+      if (!otherRecord.shifts || otherRecord.shifts.length === 0) continue;
+      for (const shift of editingShifts) {
+        if (checkTimeOverlap(shift.startTime, shift.endTime, otherRecord.shifts)) {
+          showToast(`Horario se solapa con turno existente de "${otherRecord.activityName}"`, 'error');
+          return;
+        }
+      }
+    }
+
     // Convertir achievedPerformance a números y calcular totales
     const shiftsWithNumbers = editingShifts.map(s => ({
       startTime: s.startTime,
@@ -477,7 +500,12 @@ export const DashboardScreen: React.FC = () => {
     }, 0);
 
     try {
+      const selectedActivity = activities.find(a => a.id === editingActivityId);
+      const expectedPerformance = selectedActivity?.expectedPerformance || editingRecord?.expectedPerformance || 0;
+
       await updateRecord(editingRecord.id, {
+        activityId: editingActivityId,
+        expectedPerformance,
         shifts: shiftsWithNumbers,
         achievedPerformance: totalAchieved,
         totalHours,
@@ -645,6 +673,37 @@ export const DashboardScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
+          {selectedDateRecords.length > 0 && (() => {
+            const workerIds = Array.from(new Set(selectedDateRecords.map(r => r.workerId)));
+            if (workerIds.length <= 1) return null;
+            const filterOptions = workerIds
+              .map(wId => {
+                const w = workers.find(wr => wr.id === wId);
+                return { label: w?.name || 'Desconocido', value: wId };
+              })
+              .sort((a, b) => a.label.localeCompare(b.label));
+            return (
+              <View style={styles.filterRow}>
+                <Select
+                  label=""
+                  placeholder="Filtrar por empleado"
+                  options={filterOptions}
+                  value={filterWorker}
+                  onChange={setFilterWorker}
+                />
+                {filterWorker !== '' && (
+                  <TouchableOpacity
+                    style={styles.filterClearBtn}
+                    onPress={() => setFilterWorker('')}
+                  >
+                    <MaterialIcons name="close" size={16} color={colors.danger} />
+                    <Text style={styles.filterClearBtnText}>Limpiar filtro</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })()}
+
           {selectedDateRecords.length === 0 ? (
             <View style={styles.emptyState}>
               <View style={styles.emptyIconContainer}>
@@ -657,6 +716,7 @@ export const DashboardScreen: React.FC = () => {
             </View>
           ) : (
             [...selectedDateRecords]
+              .filter(r => !filterWorker || r.workerId === filterWorker)
               .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
               .map(record => (
                 <PerformanceCard
@@ -694,23 +754,7 @@ export const DashboardScreen: React.FC = () => {
           error={addAttempted ? addWorkerError : undefined}
         />
 
-        <Text style={styles.blockSelectorLabel}>Bloque</Text>
-        <View style={styles.blockSelectorRow}>
-          {blockNames.map(b => (
-            <TouchableOpacity
-              key={b}
-              style={[styles.blockBtn, block === b && styles.blockBtnActive]}
-              onPress={() => setBlock(block === b ? '' : b)}
-            >
-              <Text style={[styles.blockBtnText, block === b && styles.blockBtnTextActive]}>{b}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        {addAttempted && addBlockError && (
-          <Text style={styles.blockErrorText}>{addBlockError}</Text>
-        )}
-
-        {selectedWorker !== '' && block !== '' && (
+        {selectedWorker !== '' && (
           <>
             <Text style={styles.editSectionTitle}>Turnos</Text>
             {newShifts.map((shift, index) => {
@@ -788,6 +832,22 @@ export const DashboardScreen: React.FC = () => {
                       </View>
                     )}
 
+                    <Text style={styles.blockSelectorLabel}>Bloque</Text>
+                    <View style={styles.blockSelectorRow}>
+                      {blockNames.map(b => (
+                        <TouchableOpacity
+                          key={b}
+                          style={[styles.blockBtn, shift.block === b && styles.blockBtnActive]}
+                          onPress={() => handleUpdateNewShift(index, 'block', shift.block === b ? '' : b)}
+                        >
+                          <Text style={[styles.blockBtnText, shift.block === b && styles.blockBtnTextActive]}>{b}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    {showFieldErrors && newShiftValidation[index]?.block && (
+                      <Text style={styles.blockErrorText}>{newShiftValidation[index].block}</Text>
+                    )}
+
                     <Input
                       label="Rendimiento"
                       placeholder="Ej: 150"
@@ -847,18 +907,31 @@ export const DashboardScreen: React.FC = () => {
                 {editingRecord?.workerCode ? `${editingRecord.workerCode} - ` : ''}{editingRecord?.workerName}
               </Text>
             </View>
-            <View style={styles.editInfoItem}>
-              <Text style={styles.editInfoLabel}>Actividad</Text>
-              <Text style={styles.editInfoValue}>{editingRecord?.activityName}</Text>
-            </View>
           </View>
         </View>
 
-        <View style={styles.metaInfo}>
-          <Text style={styles.metaText}>
-            Meta: {editingRecord?.expectedPerformance} {editingRecord?.activityUnit}/hora
-          </Text>
-        </View>
+        <Select
+          label="Actividad"
+          placeholder="Seleccionar actividad"
+          options={activities.map(a => ({
+            label: `${a.name} (${a.expectedPerformance} ${a.unit})`,
+            value: a.id,
+          }))}
+          value={editingActivityId}
+          onChange={setEditingActivityId}
+        />
+
+        {editingActivityId && (() => {
+          const activity = activities.find(a => a.id === editingActivityId);
+          if (!activity) return null;
+          return (
+            <View style={styles.metaInfo}>
+              <Text style={styles.metaText}>
+                Meta: {ActivityRepository.getPerformanceForWeek(activity, format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd'))} {activity.unit}/hora
+              </Text>
+            </View>
+          );
+        })()}
 
         <Text style={styles.editSectionTitle}>Turnos</Text>
         {editingShifts.map((shift: any, index: number) => (
@@ -1619,5 +1692,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
+  },
+  filterRow: {
+    marginBottom: 12,
+  },
+  filterClearBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    gap: 4,
+    marginTop: 4,
+  },
+  filterClearBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.danger,
   },
 });

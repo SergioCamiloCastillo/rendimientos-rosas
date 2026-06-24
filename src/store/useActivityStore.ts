@@ -11,7 +11,7 @@ interface ActivityState {
   fetchActivities: () => Promise<void>;
   fetchInactiveActivities: () => Promise<void>;
   addActivity: (input: CreateActivityInput) => Promise<Activity>;
-  updateActivity: (id: string, input: Partial<CreateActivityInput>) => Promise<void>;
+  updateActivity: (id: string, input: Partial<CreateActivityInput>, options?: { forceUpdate?: boolean }) => Promise<void>;
   deactivateActivity: (id: string) => Promise<void>;
   restoreActivity: (id: string) => Promise<void>;
   permanentDeleteActivity: (id: string) => Promise<void>;
@@ -27,6 +27,7 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const activities = await ActivityRepository.getActive();
+      activities.sort((a, b) => a.name.localeCompare(b.name));
       set({ activities, isLoading: false });
     } catch (error) {
       set({ error: 'Error al cargar actividades', isLoading: false });
@@ -46,10 +47,11 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const activity = await ActivityRepository.create(input);
-      set(state => ({ 
-        activities: [...state.activities, activity], 
-        isLoading: false 
-      }));
+      set(state => {
+        const updated = [...state.activities, activity];
+        updated.sort((a, b) => a.name.localeCompare(b.name));
+        return { activities: updated, isLoading: false };
+      });
       return activity;
     } catch (error) {
       set({ error: 'Error al crear actividad', isLoading: false });
@@ -57,15 +59,16 @@ export const useActivityStore = create<ActivityState>((set, get) => ({
     }
   },
 
-  updateActivity: async (id: string, input: Partial<CreateActivityInput>) => {
+  updateActivity: async (id: string, input: Partial<CreateActivityInput>, options?: { forceUpdate?: boolean }) => {
     set({ isLoading: true, error: null });
     try {
-      const updated = await ActivityRepository.update(id, input);
+      const updated = await ActivityRepository.update(id, input, options);
       if (updated) {
-        set(state => ({
-          activities: state.activities.map(a => a.id === id ? updated : a),
-          isLoading: false,
-        }));
+        set(state => {
+          const updatedActivities = state.activities.map(a => a.id === id ? updated : a);
+          updatedActivities.sort((a, b) => a.name.localeCompare(b.name));
+          return { activities: updatedActivities, isLoading: false };
+        });
       }
     } catch (error) {
       set({ error: 'Error al actualizar actividad', isLoading: false });

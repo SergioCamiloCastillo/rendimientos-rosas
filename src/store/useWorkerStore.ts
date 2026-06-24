@@ -27,6 +27,7 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const workers = await WorkerRepository.getActive();
+      workers.sort((a, b) => a.name.localeCompare(b.name));
       set({ workers, isLoading: false });
     } catch (error) {
       set({ error: 'Error al cargar trabajadores', isLoading: false });
@@ -46,10 +47,11 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const worker = await WorkerRepository.create(input);
-      set(state => ({ 
-        workers: [...state.workers, worker], 
-        isLoading: false 
-      }));
+      set(state => {
+        const updated = [...state.workers, worker];
+        updated.sort((a, b) => a.name.localeCompare(b.name));
+        return { workers: updated, isLoading: false };
+      });
       return worker;
     } catch (error) {
       set({ error: 'Error al crear trabajador', isLoading: false });
@@ -62,10 +64,11 @@ export const useWorkerStore = create<WorkerState>((set, get) => ({
     try {
       const updated = await WorkerRepository.update(id, input);
       if (updated) {
-        set(state => ({
-          workers: state.workers.map(w => w.id === id ? updated : w),
-          isLoading: false,
-        }));
+        set(state => {
+          const updatedWorkers = state.workers.map(w => w.id === id ? updated : w);
+          updatedWorkers.sort((a, b) => a.name.localeCompare(b.name));
+          return { workers: updatedWorkers, isLoading: false };
+        });
       }
     } catch (error) {
       set({ error: 'Error al actualizar trabajador', isLoading: false });

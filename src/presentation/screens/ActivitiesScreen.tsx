@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,7 +33,23 @@ export const ActivitiesScreen: React.FC = () => {
   const [expectedPerformance, setExpectedPerformance] = useState('');
   const [attempted, setAttempted] = useState(false);
   const [performanceLockedThisWeek, setPerformanceLockedThisWeek] = useState(false);
+  const [forceUnlocked, setForceUnlocked] = useState(false);
+  const unlockTapCount = useRef(0);
+  const unlockTapTimer = useRef<NodeJS.Timeout | null>(null);
   const { showToast } = useToast();
+
+  const handleUnlockTap = useCallback(() => {
+    if (!performanceLockedThisWeek || forceUnlocked) return;
+    unlockTapCount.current += 1;
+    if (unlockTapTimer.current) clearTimeout(unlockTapTimer.current);
+    unlockTapTimer.current = setTimeout(() => { unlockTapCount.current = 0; }, 3000);
+    if (unlockTapCount.current >= 10) {
+      setForceUnlocked(true);
+      setPerformanceLockedThisWeek(false);
+      unlockTapCount.current = 0;
+      showToast('Meta desbloqueada 🔓', 'success');
+    }
+  }, [performanceLockedThisWeek, forceUnlocked, showToast]);
 
   const {
     activities,
@@ -67,6 +83,8 @@ export const ActivitiesScreen: React.FC = () => {
     setSelectedActivity(null);
     setAttempted(false);
     setPerformanceLockedThisWeek(false);
+    setForceUnlocked(false);
+    unlockTapCount.current = 0;
   };
 
   const formErrors = useMemo(() => {
@@ -130,7 +148,7 @@ export const ActivitiesScreen: React.FC = () => {
         description: description.trim() || undefined,
         unit: unit.trim(),
         expectedPerformance: performance,
-      });
+      }, forceUnlocked ? { forceUpdate: true } : undefined);
       resetForm();
       setShowEditActivity(false);
       showToast('Actividad actualizada correctamente', 'success');
@@ -472,6 +490,7 @@ export const ActivitiesScreen: React.FC = () => {
           error={attempted ? formErrors.unit : undefined}
         />
 
+        <TouchableOpacity activeOpacity={1} onPress={handleUnlockTap}>
         <Input
           label="Meta de rendimiento (por hora)"
           placeholder="Ej: 200"
@@ -479,10 +498,9 @@ export const ActivitiesScreen: React.FC = () => {
           onChangeText={(value) => setExpectedPerformance(value.replace(',', '.'))}
           keyboardType="decimal-pad"
           editable={!performanceLockedThisWeek}
-          error={performanceLockedThisWeek 
-            ? 'La meta ya fue modificada esta semana' 
-            : (attempted ? formErrors.performance : undefined)}
+          
         />
+        </TouchableOpacity>
 
         <Button
           title="Guardar Cambios"

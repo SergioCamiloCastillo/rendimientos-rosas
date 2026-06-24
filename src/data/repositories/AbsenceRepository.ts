@@ -33,6 +33,7 @@ export class AbsenceRepository {
         peopleCount: input.peopleCount,
         hoursPerPerson: input.hoursPerPerson,
         hoursLost: input.hoursLost,
+        notes: input.notes ?? absences[existingIndex].notes ?? '',
         updatedAt: now,
       };
       const validated = AbsenceSchema.parse(updated);

@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -20,9 +22,10 @@ import { es } from 'date-fns/locale';
 interface AbsenceEntryForm {
   peopleCount: string;
   hoursPerPerson: string;
+  notes: string;
 }
 
-const emptyEntry: AbsenceEntryForm = { peopleCount: '', hoursPerPerson: '' };
+const emptyEntry: AbsenceEntryForm = { peopleCount: '', hoursPerPerson: '', notes: '' };
 
 export const AbsencesScreen: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
@@ -52,11 +55,13 @@ export const AbsencesScreen: React.FC = () => {
         setEntries(absence.entries.map(e => ({
           peopleCount: e.peopleCount.toString(),
           hoursPerPerson: e.hoursPerPerson.toString(),
+          notes: e.notes || '',
         })));
       } else {
         setEntries([{
           peopleCount: (absence.peopleCount ?? 0).toString(),
           hoursPerPerson: (absence.hoursPerPerson ?? 0).toString(),
+          notes: absence.notes || '',
         }]);
       }
     } else {
@@ -66,12 +71,13 @@ export const AbsencesScreen: React.FC = () => {
   }, [absence]);
 
   // Helpers
-  const isEntryEmpty = (entry: AbsenceEntryForm) => !entry.peopleCount && !entry.hoursPerPerson;
+  const isEntryEmpty = (entry: AbsenceEntryForm) => !entry.peopleCount && !entry.hoursPerPerson && !entry.notes;
   const isEntryFilled = (entry: AbsenceEntryForm) => !isEntryEmpty(entry);
 
   const handleUpdateEntry = (index: number, field: keyof AbsenceEntryForm, value: string) => {
     const updated = [...entries];
-    updated[index] = { ...updated[index], [field]: value.replace(',', '.') };
+    const finalValue = field === 'notes' ? value : value.replace(',', '.');
+    updated[index] = { ...updated[index], [field]: finalValue };
     setEntries(updated);
   };
 
@@ -105,7 +111,7 @@ export const AbsencesScreen: React.FC = () => {
       const hours = parseFloat(entry.hoursPerPerson) || 0;
       if (count > 0 && hours > 0) {
         totalPeople += count;
-        totalHoursLost += Math.round(count * hours * 100) / 100;
+        totalHoursLost += Math.round(count * hours * 1000) / 1000;
       }
     });
     return { totalPeople, totalHoursLost };
@@ -162,13 +168,14 @@ export const AbsencesScreen: React.FC = () => {
     const entriesToSave = validEntries.map(e => ({
       peopleCount: parseInt(e.peopleCount),
       hoursPerPerson: parseFloat(e.hoursPerPerson),
+      notes: e.notes.trim(),
     }));
 
     // Calcular totales
     const totalPeople = entriesToSave.reduce((sum, e) => sum + e.peopleCount, 0);
-    const totalHoursLost = entriesToSave.reduce((sum, e) => sum + Math.round(e.peopleCount * e.hoursPerPerson * 100) / 100, 0);
+    const totalHoursLost = entriesToSave.reduce((sum, e) => sum + Math.round(e.peopleCount * e.hoursPerPerson * 1000) / 1000, 0);
     // hoursPerPerson promedio para compatibilidad
-    const avgHoursPerPerson = totalPeople > 0 ? Math.round((totalHoursLost / totalPeople) * 100) / 100 : 0;
+    const avgHoursPerPerson = totalPeople > 0 ? Math.round((totalHoursLost / totalPeople) * 1000) / 1000 : 0;
 
     try {
       await saveAbsence({
@@ -177,6 +184,7 @@ export const AbsencesScreen: React.FC = () => {
         peopleCount: totalPeople,
         hoursPerPerson: avgHoursPerPerson,
         hoursLost: totalHoursLost,
+        notes: '',
       });
       showToast(absence ? 'Ausencia actualizada' : 'Ausencia registrada', 'success');
     } catch {
@@ -236,10 +244,15 @@ export const AbsencesScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <KeyboardAvoidingView
         style={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
+        <ScrollView
+          style={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <MaterialIcons name="person-off" size={24} color={colors.danger} />
@@ -249,7 +262,7 @@ export const AbsencesScreen: React.FC = () => {
           {entries.map((entry, index) => {
             const count = parseInt(entry.peopleCount) || 0;
             const hours = parseFloat(entry.hoursPerPerson) || 0;
-            const entryTotal = Math.round(count * hours * 100) / 100;
+            const entryTotal = Math.round(count * hours * 1000) / 1000;
             const showFieldErrors = saveAttempted && isEntryFilled(entry);
             return (
               <View key={index} style={styles.entryCard}>
@@ -298,6 +311,14 @@ export const AbsencesScreen: React.FC = () => {
                     <Text style={styles.entryTotalValue}>= {entryTotal} hrs</Text>
                   </View>
                 )}
+
+                <Input
+                  label="Observaciones"
+                  placeholder="Motivo, comentarios..."
+                  value={entry.notes}
+                  onChangeText={(v) => handleUpdateEntry(index, 'notes', v)}
+                  multiline
+                />
               </View>
             );
           })}
@@ -349,6 +370,7 @@ export const AbsencesScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };

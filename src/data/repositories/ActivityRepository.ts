@@ -67,7 +67,7 @@ export class ActivityRepository {
     return history.some(e => e.weekStart === currentWeek);
   }
 
-  static async update(id: string, input: Partial<CreateActivityInput>): Promise<Activity | null> {
+  static async update(id: string, input: Partial<CreateActivityInput>, options?: { forceUpdate?: boolean }): Promise<Activity | null> {
     const activities = await this.getAll();
     const index = activities.findIndex(a => a.id === id);
     
@@ -83,8 +83,11 @@ export class ActivityRepository {
     if (input.expectedPerformance !== undefined && input.expectedPerformance !== current.expectedPerformance) {
       // Verificar si ya se cambió esta semana (solo contar entradas válidas)
       const alreadyChanged = performanceHistory.some(e => e.weekStart === currentWeek);
-      if (alreadyChanged) {
+      if (alreadyChanged && !options?.forceUpdate) {
         throw new Error('La meta ya fue modificada esta semana. Solo se permite un cambio por semana.');
+      }
+      if (alreadyChanged && options?.forceUpdate) {
+        performanceHistory = performanceHistory.filter(e => e.weekStart !== currentWeek);
       }
 
       // Agregar entrada al historial con meta anterior

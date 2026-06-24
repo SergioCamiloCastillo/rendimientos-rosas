@@ -3,7 +3,8 @@ import { z } from 'zod';
 // Esquema para una entrada individual de ausencia
 export const AbsenceEntrySchema = z.object({
   peopleCount: z.number().int().min(1, 'Debe ser al menos 1'),
-  hoursPerPerson: z.number().min(0.5, 'Debe ser al menos 0.5'),
+  hoursPerPerson: z.number().min(0.01, 'Debe ser mayor a 0'),
+  notes: z.string().optional().default(''),
 });
 
 export type AbsenceEntry = z.infer<typeof AbsenceEntrySchema>;
@@ -15,6 +16,7 @@ export const AbsenceSchema = z.object({
   peopleCount: z.number().int().min(0, 'Debe ser 0 o más'), // total de personas
   hoursPerPerson: z.number().min(0, 'Debe ser 0 o más'), // promedio (para compatibilidad)
   hoursLost: z.number().min(0, 'Debe ser 0 o más'), // total horas perdidas
+  notes: z.string().optional().default(''),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
