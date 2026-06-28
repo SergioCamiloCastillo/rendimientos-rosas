@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Modal,
@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { colors } from '../theme';
@@ -22,12 +21,33 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   onClose,
   children,
 }) => {
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    // En iOS usamos los eventos "Will" (más suaves), en Android los "Did"
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   return (
     <Modal
       visible={visible === true}
       transparent={true}
       animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent={true}
     >
       <View style={styles.overlay}>
         <TouchableOpacity
@@ -35,20 +55,23 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
           activeOpacity={1}
           onPress={() => { Keyboard.dismiss(); onClose(); }}
         />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.container}
-        >
+        <View style={styles.container}>
           <View style={styles.handle} />
           <ScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollContent}
+            keyboardDismissMode="interactive"
+            contentContainerStyle={[
+              styles.scrollContent,
+              // Espacio extra igual a la altura del teclado para que el
+              // input enfocado quede visible justo encima del teclado.
+              { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 20 : 20 },
+            ]}
             bounces={false}
           >
             {children}
           </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
       </View>
     </Modal>
   );

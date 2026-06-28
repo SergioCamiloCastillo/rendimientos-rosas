@@ -14,7 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { colors } from '../theme';
-import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker, Sidebar, MenuButton } from '../components';
+import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker, Sidebar, VoiceButton } from '../components';
+import { parseVoiceWithGemini } from '../../services/geminiService';
 
 import { useWorkerStore, useActivityStore, usePerformanceStore, useBlockStore } from '../../store';
 import { ActivityRepository } from '../../data/repositories';
@@ -40,6 +41,26 @@ export const DashboardScreen: React.FC = () => {
   const [editingShifts, setEditingShifts] = useState<any[]>([]);
   const [shiftErrors, setShiftErrors] = useState<number[]>([]);
   const [addAttempted, setAddAttempted] = useState(false);
+  const [isVoiceProcessing, setIsVoiceProcessing] = useState(false);
+  const [showVoiceSheet, setShowVoiceSheet] = useState(false);
+
+  // Vista previa de registros dictados por voz
+  interface VoicePreviewShift {
+    activityId: string;
+    activityName: string;
+    startTime: string;
+    endTime: string;
+    block: string;
+    achievedPerformance: number;
+    issues: string[];
+  }
+  interface VoicePreviewRecord {
+    workerId: string;
+    workerName: string;
+    shifts: VoicePreviewShift[];
+    notes?: string;
+  }
+  const [voicePreview, setVoicePreview] = useState<VoicePreviewRecord[]>([]);
 
   // Estado para múltiples turnos en "Nuevo Registro"
   interface NewShiftEntry {
@@ -379,6 +400,161 @@ export const DashboardScreen: React.FC = () => {
     setNotes('');
     setEditingRecord(null);
     setAddAttempted(false);
+  };
+
+  // Buscar trabajador por id o por nombre aproximado
+  const resolveWorker = (workerId?: string, workerName?: string) => {
+    if (workerId && workers.find(w => w.id === workerId)) {
+      return workers.find(w => w.id === workerId)!;
+    }
+    if (workerName) {
+      const n = workerName.toLowerCase();
+      return workers.find(w =>
+        w.name.toLowerCase().includes(n) || n.includes(w.name.toLowerCase())
+      );
+    }
+    return undefined;
+  };
+
+  // Buscar actividad por id o por nombre aproximado
+  const resolveActivity = (activityId?: string, activityName?: string) => {
+    if (activityId && activities.find(a => a.id === activityId)) {
+      return activities.find(a => a.id === activityId)!;
+    }
+    if (activityName) {
+      const n = activityName.toLowerCase();
+      return activities.find(a =>
+        a.name.toLowerCase().includes(n) || n.includes(a.name.toLowerCase())
+      );
+    }
+    return undefined;
+  };
+
+  // Buscar bloque por nombre aproximado (case-insensitive)
+  const resolveBlock = (block?: string) => {
+    if (!block) return '';
+    const exact = blockNames.find(b => b.toLowerCase() === block.toLowerCase());
+    if (exact) return exact;
+    const partial = blockNames.find(b =>
+      b.toLowerCase().includes(block.toLowerCase()) || block.toLowerCase().includes(b.toLowerCase())
+    );
+    return partial || '';
+  };
+
+  const handleVoiceTranscript = async (transcript: string) => {
+    if (!transcript.trim()) return;
+    setIsVoiceProcessing(true);
+    try {
+      const parsed = await parseVoiceWithGemini(transcript, {
+        workers: workers.map(w => ({ id: w.id, name: w.name, code: w.code })),
+        activities: activities.map(a => ({ id: a.id, name: a.name, unit: a.unit })),
+        blocks: blockNames,
+      });
+
+      if (!parsed.records || parsed.records.length === 0) {
+        showToast('No se entendió ningún registro. Intenta de nuevo.', 'error');
+        return;
+      }
+
+      // Construir vista previa con validación
+      const preview: VoicePreviewRecord[] = parsed.records.map(rec => {
+        const worker = resolveWorker(rec.workerId, rec.workerName);
+        const shifts: VoicePreviewShift[] = (rec.shifts || []).map(s => {
+          const activity = resolveActivity(s.activityId, s.activityName);
+          const block = resolveBlock(s.block);
+          const issues: string[] = [];
+          if (!activity) issues.push('actividad no encontrada');
+          if (!s.startTime || !s.endTime) issues.push('horario incompleto');
+          else if (calculateHours(s.startTime, s.endTime) <= 0) issues.push('horario inválido');
+          if (!block) issues.push('bloque no encontrado');
+          if (!s.achievedPerformance || s.achievedPerformance <= 0) issues.push('rendimiento faltante');
+          return {
+            activityId: activity?.id || '',
+            activityName: activity?.name || s.activityName || '—',
+            startTime: s.startTime || '',
+            endTime: s.endTime || '',
+            block,
+            achievedPerformance: s.achievedPerformance || 0,
+            issues,
+          };
+        });
+        return {
+          workerId: worker?.id || '',
+          workerName: worker?.name || rec.workerName || '— sin trabajador —',
+          shifts,
+          notes: rec.notes,
+        };
+      });
+
+      setVoicePreview(preview);
+      showToast('Revisa los registros y confirma.', 'success');
+    } catch (error: any) {
+      console.log('[Voice] Error al procesar:', error?.message || error);
+      showToast(`Error IA: ${error?.message || 'desconocido'}`, 'error');
+    } finally {
+      setIsVoiceProcessing(false);
+    }
+  };
+
+  const handleSaveVoiceRecords = async () => {
+    const dateWeekStart = format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    let created = 0;
+    try {
+      for (const rec of voicePreview) {
+        if (!rec.workerId) {
+          showToast(`Falta trabajador en "${rec.workerName}"`, 'error');
+          return;
+        }
+        // Solo turnos válidos (sin issues)
+        const validShifts = rec.shifts.filter(s => s.issues.length === 0);
+        if (validShifts.length === 0) {
+          showToast(`"${rec.workerName}" no tiene turnos válidos`, 'error');
+          return;
+        }
+
+        // Agrupar por actividad
+        const groupedByActivity: Record<string, VoicePreviewShift[]> = {};
+        for (const s of validShifts) {
+          if (!groupedByActivity[s.activityId]) groupedByActivity[s.activityId] = [];
+          groupedByActivity[s.activityId].push(s);
+        }
+
+        for (const [activityId, shifts] of Object.entries(groupedByActivity)) {
+          const activity = activities.find(a => a.id === activityId);
+          if (!activity) continue;
+          const expectedPerformanceToUse = ActivityRepository.getPerformanceForWeek(activity, dateWeekStart);
+
+          const shiftsData = shifts.map(s => ({
+            startTime: s.startTime,
+            endTime: s.endTime,
+            block: s.block || undefined,
+            achievedPerformance: s.achievedPerformance,
+          }));
+          const totalAchieved = shiftsData.reduce((sum, s) => sum + s.achievedPerformance, 0);
+          const totalHours = shiftsData.reduce((sum, s) => sum + calculateHours(s.startTime, s.endTime), 0);
+
+          await addRecord({
+            workerId: rec.workerId,
+            activityId,
+            date: format(selectedDate, 'yyyy-MM-dd'),
+            achievedPerformance: totalAchieved,
+            expectedPerformance: expectedPerformanceToUse,
+            shifts: shiftsData,
+            totalHours,
+            notes: rec.notes || undefined,
+          });
+          created++;
+        }
+      }
+
+      setVoicePreview([]);
+      setShowVoiceSheet(false);
+      await fetchRecordsByDate(selectedDate);
+      await fetchStatsByDate(selectedDate);
+      showToast(created > 1 ? `${created} registros guardados` : 'Registro guardado', 'success');
+    } catch (error) {
+      showToast('No se pudieron guardar los registros', 'error');
+    }
   };
 
   const handleEditRecord = (record: any) => {
@@ -737,7 +913,91 @@ export const DashboardScreen: React.FC = () => {
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.voiceFab}
+        onPress={() => setShowVoiceSheet(true)}
+      >
+        <MaterialIcons name="mic" size={26} color={colors.white} />
+      </TouchableOpacity>
+
       <Sidebar visible={showMenu} onClose={() => setShowMenu(false)} />
+
+      <BottomSheet visible={showVoiceSheet} onClose={() => { setVoicePreview([]); setShowVoiceSheet(false); }}>
+        <Text style={styles.sheetTitle}>Registrar por Voz</Text>
+        <Text style={styles.sheetDate}>
+          {format(selectedDate, "EEEE, d 'de' MMMM yyyy", { locale: es })}
+        </Text>
+
+        {voicePreview.length === 0 ? (
+          <>
+            <View style={styles.voiceInstructions}>
+              <Text style={styles.voiceInstructionTitle}>¿Cómo dictar registros?</Text>
+              <Text style={styles.voiceInstructionText}>
+                "Juan García, turno de 7am a 3pm, bloque A, 150 rosas"
+              </Text>
+              <Text style={styles.voiceInstructionText}>
+                Varios: "Juan de 7 a 3 bloque A 150 rosas, y María de 8 a 12 bloque B 80 plantas"
+              </Text>
+            </View>
+            <VoiceButton
+              onTranscript={handleVoiceTranscript}
+              isProcessing={isVoiceProcessing}
+            />
+          </>
+        ) : (
+          <>
+            <Text style={styles.editSectionTitle}>
+              {voicePreview.length} {voicePreview.length === 1 ? 'registro' : 'registros'} detectado{voicePreview.length === 1 ? '' : 's'}
+            </Text>
+            {voicePreview.map((rec, ri) => (
+              <View key={ri} style={styles.voicePreviewCard}>
+                <View style={styles.voicePreviewHeader}>
+                  <MaterialIcons
+                    name={rec.workerId ? 'person' : 'person-off'}
+                    size={18}
+                    color={rec.workerId ? colors.primary : colors.danger}
+                  />
+                  <Text style={[styles.voicePreviewWorker, !rec.workerId && styles.voicePreviewError]}>
+                    {rec.workerName}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setVoicePreview(voicePreview.filter((_, i) => i !== ri))}
+                    style={styles.deleteShiftBtn}
+                  >
+                    <MaterialIcons name="close" size={18} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+                {rec.shifts.map((s, si) => (
+                  <View key={si} style={styles.voicePreviewShift}>
+                    <Text style={styles.voicePreviewShiftText}>
+                      {formatTimeToAMPM(s.startTime)} - {formatTimeToAMPM(s.endTime)} · {s.activityName} · Bloque {s.block || '?'} · {s.achievedPerformance}
+                    </Text>
+                    {s.issues.length > 0 && (
+                      <Text style={styles.voicePreviewIssue}>⚠ {s.issues.join(', ')}</Text>
+                    )}
+                  </View>
+                ))}
+                {rec.notes ? (
+                  <Text style={styles.voicePreviewNotes}>Nota: {rec.notes}</Text>
+                ) : null}
+              </View>
+            ))}
+
+            <Button
+              title={voicePreview.length > 1 ? `Guardar ${voicePreview.length} registros` : 'Guardar registro'}
+              onPress={handleSaveVoiceRecords}
+              loading={isLoading}
+            />
+            <TouchableOpacity
+              style={styles.voiceRetryBtn}
+              onPress={() => setVoicePreview([])}
+            >
+              <MaterialIcons name="mic" size={18} color={colors.primary} />
+              <Text style={styles.voiceRetryText}>Dictar de nuevo</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </BottomSheet>
 
       <BottomSheet visible={showAddRecord} onClose={() => { resetForm(); setShowAddRecord(false); }}>
         <Text style={styles.sheetTitle}>Nuevo Registro</Text>
@@ -1422,6 +1682,101 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: colors.white,
     fontWeight: '300',
+  },
+  voiceFab: {
+    position: 'absolute',
+    bottom: 92,
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.success,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  voiceInstructions: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  voiceInstructionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  voiceInstructionText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  voicePreviewCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  voicePreviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  voicePreviewWorker: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  voicePreviewError: {
+    color: colors.danger,
+  },
+  voicePreviewShift: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  voicePreviewShiftText: {
+    fontSize: 13,
+    color: colors.text,
+    fontWeight: '500',
+  },
+  voicePreviewIssue: {
+    fontSize: 12,
+    color: colors.danger,
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  voicePreviewNotes: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  voiceRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    marginTop: 12,
+  },
+  voiceRetryText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primary,
   },
   sheetTitle: {
     fontSize: 20,
