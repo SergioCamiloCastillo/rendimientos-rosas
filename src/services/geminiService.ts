@@ -74,31 +74,48 @@ Notas importantes:
 - Para el bloque, usa SIEMPRE el nombre exacto que aparece en la lista de bloques disponibles (respeta mayúsculas/minúsculas). Si dice "bloque 10" y existe "10", usa "10".
 - Si una nota aplica a un trabajador, ponla en su campo "notes"`;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 2048,
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      }),
-    }
-  );
+  // Modelos en orden de preferencia: si uno falla, se intenta el siguiente
+  const models = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest'];
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gemini API error: ${error}`);
+  let text: string | undefined;
+  let lastError = '';
+
+  for (const model of models) {
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 2048,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        lastError = await response.text();
+        console.log(`[Gemini] ${model} falló (${response.status}), probando siguiente...`);
+        continue;
+      }
+
+      const data = await response.json();
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) break;
+
+      lastError = 'Respuesta vacía';
+      console.log(`[Gemini] ${model} devolvió respuesta vacía, probando siguiente...`);
+    } catch (e: any) {
+      lastError = e?.message || 'Error de red';
+      console.log(`[Gemini] ${model} error de red, probando siguiente...`);
+    }
   }
 
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!text) throw new Error('Respuesta vacía de Gemini');
+  if (!text) throw new Error(`Gemini API error: ${lastError}`);
 
   // Limpiar posibles bloques de código markdown
   const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

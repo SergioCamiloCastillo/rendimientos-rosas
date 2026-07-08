@@ -519,6 +519,30 @@ export const DashboardScreen: React.FC = () => {
           groupedByActivity[s.activityId].push(s);
         }
 
+        // Verificar solapamiento con registros existentes del trabajador
+        const existingRecords = selectedDateRecords.filter(
+          r => r.workerId === rec.workerId && !r.isDeleted
+        );
+        for (const s of validShifts) {
+          for (const existingRecord of existingRecords) {
+            if (!existingRecord.shifts || existingRecord.shifts.length === 0) continue;
+            if (checkTimeOverlap(s.startTime, s.endTime, existingRecord.shifts)) {
+              showToast(`Horario de "${rec.workerName}" se solapa con "${existingRecord.activityName}"`, 'error');
+              return;
+            }
+          }
+        }
+
+        // Verificar solapamiento entre los propios turnos del voice record
+        for (let i = 0; i < validShifts.length; i++) {
+          for (let j = i + 1; j < validShifts.length; j++) {
+            if (checkTimeOverlap(validShifts[i].startTime, validShifts[i].endTime, [{ startTime: validShifts[j].startTime, endTime: validShifts[j].endTime }])) {
+              showToast(`Turnos de "${rec.workerName}" se solapan entre sí`, 'error');
+              return;
+            }
+          }
+        }
+
         for (const [activityId, shifts] of Object.entries(groupedByActivity)) {
           const activity = activities.find(a => a.id === activityId);
           if (!activity) continue;
@@ -914,7 +938,7 @@ export const DashboardScreen: React.FC = () => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={styles.voiceFab}
+        style={[styles.voiceFab]}
         onPress={() => setShowVoiceSheet(true)}
       >
         <MaterialIcons name="mic" size={26} color={colors.white} />
