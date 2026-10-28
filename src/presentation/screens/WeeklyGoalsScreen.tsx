@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 import { Sidebar, MenuButton, BottomSheet, Select, Input, Button } from '../components';
 import { useActivityStore, useWeeklyGoalStore, useBlockStore } from '../../store';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
@@ -366,14 +366,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   weekSelector: {
     flexDirection: 'row',
@@ -427,7 +428,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   progressCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
@@ -506,9 +507,10 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 20,
-    fontWeight: '700',
     color: colors.text,
     marginBottom: 4,
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   sheetSubtitle: {
     fontSize: 14,

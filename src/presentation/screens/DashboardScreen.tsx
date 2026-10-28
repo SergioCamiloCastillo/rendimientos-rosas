@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 import { PerformanceCard, Button, BottomSheet, Input, Select, TimePicker, Sidebar } from '../components';
 
 import { useWorkerStore, useActivityStore, usePerformanceStore, useBlockStore } from '../../store';
@@ -1125,8 +1125,9 @@ const styles = StyleSheet.create({
   },
   sidebarTitle: {
     fontSize: 20,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   sidebarContent: {
     flex: 1,
@@ -1174,10 +1175,11 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 16,
-    fontWeight: '600',
     color: colors.text,
     textTransform: 'capitalize',
     textAlign: 'center',
+    fontFamily: fonts.displayMedium,
+    letterSpacing: -0.3,
   },
   todayHint: {
     fontSize: 11,
@@ -1219,7 +1221,8 @@ const styles = StyleSheet.create({
   },
   statCardValue: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   statCardLabel: {
     fontSize: 10,
@@ -1277,9 +1280,10 @@ const styles = StyleSheet.create({
   },
   percentageValue: {
     fontSize: 28,
-    fontWeight: '700',
     color: colors.primary,
     marginBottom: 8,
+    fontFamily: fonts.display,
+    letterSpacing: -0.6,
   },
   progressBar: {
     height: 6,
@@ -1307,8 +1311,9 @@ const styles = StyleSheet.create({
   },
   miniTitle: {
     fontSize: 16,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.displayMedium,
+    letterSpacing: -0.3,
   },
   miniStats: {
     flexDirection: 'row',
@@ -1416,10 +1421,11 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 20,
-    fontWeight: '700',
     color: colors.text,
     marginBottom: 8,
     textAlign: 'center',
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   sheetDate: {
     fontSize: 14,

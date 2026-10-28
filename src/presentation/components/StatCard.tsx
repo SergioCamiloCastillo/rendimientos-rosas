@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 
 interface StatCardProps {
   title: string;
@@ -40,7 +40,8 @@ const styles = StyleSheet.create({
   },
   value: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: fonts.display,
+    letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 11,

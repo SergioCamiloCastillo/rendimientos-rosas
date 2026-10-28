@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 import { Button, Input, BottomSheet, ListItem, EmptyState, Sidebar, MenuButton } from '../components';
 import { useWorkerStore } from '../../store';
 import { Worker } from '../../domain/entities';
@@ -386,8 +386,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.5,
   },
   historyButton: {
     width: 44,
@@ -491,10 +492,11 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 20,
-    fontWeight: '700',
     color: colors.text,
     marginBottom: 24,
     textAlign: 'center',
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   deleteSection: {
     marginTop: 16,

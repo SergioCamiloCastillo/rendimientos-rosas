@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 import { PerformanceCard, BottomSheet, Select, Button, EmptyState, Sidebar, MenuButton, Input } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore, useBlockStore } from '../../store';
 import { exportToExcel, exportByActivity, exportByWorker } from '../../utils/excelExport';
@@ -386,8 +386,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.5,
   },
   headerActions: {
     flexDirection: 'row',
@@ -423,8 +424,9 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 20,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   statLabel: {
     fontSize: 10,
@@ -492,10 +494,11 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 20,
-    fontWeight: '700',
     color: colors.text,
     marginBottom: 8,
     textAlign: 'center',
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   exportSubtitle: {
     fontSize: 14,

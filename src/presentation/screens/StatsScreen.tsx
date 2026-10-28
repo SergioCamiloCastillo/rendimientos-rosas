@@ -18,7 +18,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import ViewShot from 'react-native-view-shot';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 import { Select, Sidebar, MenuButton } from '../components';
 import { PerformanceRepository, WorkerRepository } from '../../data/repositories';
 import { PerformanceRecordWithDetails, Worker } from '../../domain/entities';
@@ -343,7 +343,7 @@ export const StatsScreen: React.FC = () => {
         {workerStats.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionTitleRow}>
-              <MaterialIcons name="emoji-events" size={20} color="#F59E0B" />
+              <MaterialIcons name="emoji-events" size={20} color={colors.warning} />
               <Text style={styles.sectionTitleWithIcon}>Top 3 Mejores Trabajadores</Text>
             </View>
             <View style={styles.topWorkersContainer}>
@@ -528,7 +528,7 @@ export const StatsScreen: React.FC = () => {
                       y1={`${100 - (100 / 150) * 100}%`} 
                       x2="100%" 
                       y2={`${100 - (100 / 150) * 100}%`} 
-                      stroke="#9CA3AF" 
+                      stroke={colors.gray[400]} 
                       strokeWidth="1.5" 
                       strokeDasharray="5,5"
                     />
@@ -650,7 +650,7 @@ export const StatsScreen: React.FC = () => {
                       y1={`${100 - (100 / 150) * 100}%`} 
                       x2="100%" 
                       y2={`${100 - (100 / 150) * 100}%`} 
-                      stroke="#9CA3AF" 
+                      stroke={colors.gray[400]} 
                       strokeWidth="1.5" 
                       strokeDasharray="5,5"
                     />
@@ -827,8 +827,9 @@ const styles = StyleSheet.create({
   },
   topTitle: {
     fontSize: 18,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   header: {
     paddingHorizontal: 20,
@@ -837,8 +838,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.6,
   },
   filterSection: {
     paddingHorizontal: 20,
@@ -904,7 +906,7 @@ const styles = StyleSheet.create({
   },
   topWorkerFirst: {
     borderWidth: 2,
-    borderColor: '#F59E0B',
+    borderColor: colors.warning,
   },
   topWorkerRank: {
     marginRight: 12,
@@ -1138,7 +1140,7 @@ const styles = StyleSheet.create({
     top: -4,
     bottom: -4,
     width: 2,
-    backgroundColor: '#1E40AF',
+    backgroundColor: colors.text,
     zIndex: 10,
   },
   metaLegend: {
@@ -1152,12 +1154,12 @@ const styles = StyleSheet.create({
   metaLegendLine: {
     width: 20,
     height: 2,
-    backgroundColor: '#1E40AF',
+    backgroundColor: colors.text,
     marginRight: 8,
   },
   metaLegendText: {
     fontSize: 12,
-    color: '#1E40AF',
+    color: colors.text,
     fontWeight: '500',
   },
   noDataContainer: {
@@ -1187,7 +1189,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: '#1E40AF',
+    backgroundColor: colors.text,
     zIndex: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1196,7 +1198,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: -35,
     fontSize: 10,
-    color: '#1E40AF',
+    color: colors.text,
     fontWeight: '600',
   },
   verticalBarsContainer: {
@@ -1245,12 +1247,12 @@ const styles = StyleSheet.create({
   goalLineLegendMark: {
     width: 20,
     height: 2,
-    backgroundColor: '#1E40AF',
+    backgroundColor: colors.text,
     marginRight: 6,
   },
   goalLineLegendText: {
     fontSize: 11,
-    color: '#1E40AF',
+    color: colors.text,
     fontWeight: '500',
   },
   lineGraphWrapper: {
@@ -1277,7 +1279,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: '#1E40AF',
+    backgroundColor: colors.text,
     opacity: 0.5,
   },
   lineGraphContent: {
@@ -1357,7 +1359,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderBottomWidth: 1,
     height: 2,
-    backgroundColor: '#1E40AF',
+    backgroundColor: colors.text,
   },
   simpleChartContent: {
     flexDirection: 'row',

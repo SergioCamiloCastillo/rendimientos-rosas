@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-
 import { Drawer as PaperDrawer, Portal, Modal, Appbar, Divider, List } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 
 interface SidebarProps {
   visible: boolean;
@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 300,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     shadowColor: '#000',
     shadowOffset: { width: 2, height: 0 },
     shadowOpacity: 0.25,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   },
   drawerContainer: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
   },
   header: {
     backgroundColor: colors.primary,
@@ -136,7 +136,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     color: colors.white,
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   accordionTitle: {
     fontSize: 16,

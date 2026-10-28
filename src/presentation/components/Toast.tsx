@@ -28,7 +28,7 @@ const toastConfig = {
     icon: '✕',
   },
   warning: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: colors.warning,
     icon: '⚠',
   },
   info: {

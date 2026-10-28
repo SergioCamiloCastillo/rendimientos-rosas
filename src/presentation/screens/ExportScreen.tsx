@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 import { usePerformanceStore, useWorkerStore, useActivityStore, useBlockStore } from '../../store';
 import { exportToExcel, exportByActivity, exportByWorker, exportWeeklyReport, exportWorkPlan, WEEKLY_SUMMARY_FIELDS, WEEKLY_DETAIL_FIELDS } from '../../utils/excelExport';
 import { useToast } from '../context/ToastContext';
@@ -257,8 +257,8 @@ export const ExportScreen: React.FC = () => {
               activeOpacity={0.7}
               disabled={exporting}
             >
-              <View style={[styles.optionIcon, { backgroundColor: '#E0F2FE' }]}>
-                <MaterialIcons name="date-range" size={24} color="#0284C7" />
+              <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
+                <MaterialIcons name="date-range" size={24} color={colors.primary} />
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Reporte Semanal</Text>
@@ -275,8 +275,8 @@ export const ExportScreen: React.FC = () => {
             activeOpacity={0.7}
             disabled={exporting}
           >
-            <View style={[styles.optionIcon, { backgroundColor: '#F0FDF4' }]}>
-              <MaterialIcons name="assignment" size={24} color="#16A34A" />
+            <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
+              <MaterialIcons name="assignment" size={24} color={colors.primary} />
             </View>
             <View style={styles.optionContent}>
               <Text style={styles.optionTitle}>Reporte Plan de Trabajo</Text>
@@ -294,8 +294,8 @@ export const ExportScreen: React.FC = () => {
               activeOpacity={0.7}
               disabled={exporting}
             >
-              <View style={[styles.optionIcon, { backgroundColor: colors.successLight }]}>
-                <MaterialIcons name="category" size={24} color={colors.success} />
+              <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
+                <MaterialIcons name="category" size={24} color={colors.primary} />
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Por Actividad</Text>
@@ -317,8 +317,8 @@ export const ExportScreen: React.FC = () => {
               activeOpacity={0.7}
               disabled={exporting}
             >
-              <View style={[styles.optionIcon, { backgroundColor: '#FEF3C7' }]}>
-                <MaterialIcons name="people" size={24} color="#F59E0B" />
+              <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
+                <MaterialIcons name="people" size={24} color={colors.primary} />
               </View>
               <View style={styles.optionContent}>
                 <Text style={styles.optionTitle}>Por Trabajador</Text>
@@ -541,8 +541,9 @@ const styles = StyleSheet.create({
   },
   topTitle: {
     fontSize: 18,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.4,
   },
   filterSection: {
     paddingHorizontal: 20,
@@ -632,9 +633,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
     color: colors.text,
     marginBottom: 4,
+    fontFamily: fonts.display,
+    letterSpacing: -0.6,
   },
   subtitle: {
     fontSize: 16,

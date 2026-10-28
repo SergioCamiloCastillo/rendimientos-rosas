@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import { colors } from '../theme';
+import { colors, fonts } from '../theme';
 import { Input, Button, Sidebar, MenuButton } from '../components';
 import { useAbsenceStore } from '../../store';
 import { useToast } from '../context/ToastContext';
@@ -390,8 +390,9 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
     color: colors.text,
+    fontFamily: fonts.display,
+    letterSpacing: -0.5,
   },
   dateSelector: {
     flexDirection: 'row',
@@ -535,8 +536,9 @@ const styles = StyleSheet.create({
   },
   grandTotalValue: {
     fontSize: 28,
-    fontWeight: '700',
     color: colors.danger,
+    fontFamily: fonts.display,
+    letterSpacing: -0.6,
   },
   grandTotalLabel: {
     fontSize: 13,

@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# fuentes con licencia que no permite redistribuirlas (ver assets/fonts/README.md)
+assets/fonts/*.ttf

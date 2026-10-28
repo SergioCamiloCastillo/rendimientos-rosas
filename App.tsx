@@ -4,9 +4,26 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { PaperProvider } from 'react-native-paper';
+import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { AppNavigator } from './src/presentation/navigation/AppNavigator';
 import { ToastProvider } from './src/presentation/context/ToastContext';
+import { colors } from './src/presentation/theme';
+
+const paperTheme = {
+  ...MD3LightTheme,
+  colors: {
+    ...MD3LightTheme.colors,
+    primary: colors.primary,
+    primaryContainer: colors.primaryLight,
+    secondaryContainer: colors.primaryLight,
+    background: colors.background,
+    surface: colors.surface,
+    onSurface: colors.text,
+    onSurfaceVariant: colors.textSecondary,
+    outlineVariant: colors.border,
+    error: colors.danger,
+  },
+};
 
 LogBox.ignoreLogs([
   'Non-serializable values were found in the navigation state',
@@ -34,7 +51,7 @@ export default function App() {
   }, []);
 
   return (
-    <PaperProvider>
+    <PaperProvider theme={paperTheme}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <ToastProvider>

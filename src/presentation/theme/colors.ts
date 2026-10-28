@@ -1,44 +1,46 @@
+// Paleta estilo FDRY: base crema + tinta casi negra + un solo acento (turquesa profundo).
+// Los colores de estado se mantienen porque comunican meta cumplida / no cumplida.
 export const colors = {
-  primary: '#2CBCB6',
-  primaryLight: '#E8F8F7',
-  primaryDark: '#1A9994',
-  
-  secondary: '#FF9500',
-  secondaryLight: '#FFF4E5',
-  
-  success: '#34C759',
-  successLight: '#E8F9ED',
-  
-  danger: '#FF3B30',
-  dangerLight: '#FFEBEA',
-  
-  warning: '#FFCC00',
-  warningLight: '#FFF9E5',
-  
-  background: '#F5F7FA',
-  surface: '#FFFFFF',
-  
-  text: '#1A1A2E',
-  textSecondary: '#6B7280',
-  textLight: '#9CA3AF',
-  
-  border: '#E5E7EB',
-  borderLight: '#F3F4F6',
-  
+  primary: '#108474',
+  primaryLight: '#DCEBE5',
+  primaryDark: '#0B5F54',
+
+  secondary: '#B8641E',
+  secondaryLight: '#F5E6D6',
+
+  success: '#2F8A4C',
+  successLight: '#E1EFDF',
+
+  danger: '#C2412D',
+  dangerLight: '#F6E0DA',
+
+  warning: '#C99317',
+  warningLight: '#F6EACB',
+
+  background: '#F7F0E8',
+  surface: '#FFFCF8',
+
+  text: '#221E1E',
+  textSecondary: '#6F675E',
+  textLight: '#8C8379',
+
+  border: '#E4DCD0',
+  borderLight: '#EFE8DE',
+
   white: '#FFFFFF',
   black: '#000000',
-  
+
   gray: {
-    50: '#F9FAFB',
-    100: '#F3F4F6',
-    200: '#E5E7EB',
-    300: '#D1D5DB',
-    400: '#9CA3AF',
-    500: '#6B7280',
-    600: '#4B5563',
-    700: '#374151',
-    800: '#1F2937',
-    900: '#111827',
+    50: '#FBF8F4',
+    100: '#F2ECE4',
+    200: '#E4DCD0',
+    300: '#D2C8BB',
+    400: '#A39A8F',
+    500: '#6F675E',
+    600: '#575049',
+    700: '#423C37',
+    800: '#2E2927',
+    900: '#221E1E',
   },
 };
 
