@@ -7,3 +7,4 @@ export * from './StatsScreen';
 export * from './AbsencesScreen';
 export * from './WeeklyGoalsScreen';
 export * from './BlocksScreen';
+export * from './BackupScreen';

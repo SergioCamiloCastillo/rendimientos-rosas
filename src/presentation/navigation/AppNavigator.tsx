@@ -14,6 +14,7 @@ import {
   AbsencesScreen,
   WeeklyGoalsScreen,
   BlocksScreen,
+  BackupScreen,
 } from '../screens';
 
 const Tab = createBottomTabNavigator();
@@ -106,6 +107,13 @@ export const AppNavigator: React.FC = () => {
         <Tab.Screen
           name="Blocks"
           component={BlocksScreen}
+          options={{
+            tabBarItemStyle: { display: 'none' },
+          }}
+        />
+        <Tab.Screen
+          name="Backup"
+          component={BackupScreen}
           options={{
             tabBarItemStyle: { display: 'none' },
           }}

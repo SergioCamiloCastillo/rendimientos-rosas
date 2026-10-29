@@ -96,7 +96,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose }) => {
                 icon={() => <MaterialIcons name="event-busy" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Absences')}
               />
-             
+              <PaperDrawer.Item
+                label="Respaldo"
+                icon={() => <MaterialIcons name="backup" size={24} color={colors.primary} />}
+                onPress={() => navigateTo('Backup')}
+              />
             </List.Accordion>
           </ScrollView>
         </View>
