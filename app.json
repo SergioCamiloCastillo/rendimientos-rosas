@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -20,7 +19,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#108474"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.sergiocastillo.rendimientosrosas",
       "blockedPermissions": [
@@ -43,7 +41,8 @@
             "./assets/fonts/ClashDisplay-Semibold.ttf"
           ]
         }
-      ]
+      ],
+      "expo-sharing"
     ]
   }
 }
