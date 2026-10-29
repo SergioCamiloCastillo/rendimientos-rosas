@@ -27,6 +27,12 @@ import { es } from 'date-fns/locale';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+// Gráfica de barras verticales: alturas fijas para que la línea del 100% use la misma escala que las barras
+const BAR_CHART_MAX_PCT = 150;
+const BAR_VALUE_HEIGHT = 18;
+const BAR_TRACK_HEIGHT = 120;
+const BAR_GOAL_LINE_TOP = BAR_VALUE_HEIGHT + BAR_TRACK_HEIGHT * (1 - 100 / BAR_CHART_MAX_PCT) - 1;
+
 interface WorkerStats {
   id: string;
   name: string;
@@ -393,23 +399,24 @@ export const StatsScreen: React.FC = () => {
             {/* --- VISIBLE UI CHART (Scrollable) --- */}
             <View style={styles.chartContainer}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={[styles.verticalChartWrapper, { width: workerStats.length * (workerStats.length > 8 ? 35 : workerStats.length > 5 ? 42 : 50) + 40 }]}>
+                <View style={[styles.verticalChartWrapper, { width: workerStats.length * ((workerStats.length > 8 ? 35 : workerStats.length > 5 ? 42 : 50) + 8) + 40 }]}>
                   <View style={styles.verticalChartArea}>
-                    <View style={[styles.goalLine, { bottom: `${(100 / 150) * 100}%` }]}>
+                    <View style={styles.goalLine}>
                       <Text style={styles.goalLineLabel}>100%</Text>
                     </View>
                     <View style={styles.verticalBarsContainer}>
                       {workerStats.map((worker) => {
-                        const maxPct = 150;
-                        const barHeight = Math.min((worker.avgPercentage / maxPct) * 100, 100);
+                        const barHeight = Math.min((worker.avgPercentage / BAR_CHART_MAX_PCT) * 100, 100);
                         const uiWrapperWidth = workerStats.length > 8 ? 35 : workerStats.length > 5 ? 42 : 50;
                         const uiBarWidth = workerStats.length > 8 ? 16 : workerStats.length > 5 ? 20 : 24;
                         
                         return (
                           <View key={worker.id} style={[styles.verticalBarWrapper, { width: uiWrapperWidth }]}>
-                            <Text style={[styles.verticalBarValue, { color: getPercentageColor(worker.avgPercentage), fontSize: workerStats.length > 8 ? 8 : 10 }]}>
-                              {worker.avgPercentage}%
-                            </Text>
+                            <View style={styles.verticalBarValueBox}>
+                              <Text style={[styles.verticalBarValue, { color: getPercentageColor(worker.avgPercentage), fontSize: workerStats.length > 8 ? 8 : 10 }]}>
+                                {worker.avgPercentage}%
+                              </Text>
+                            </View>
                             <View style={[styles.verticalBarTrack, { width: uiBarWidth }]}>
                               <View 
                                 style={[
@@ -445,22 +452,24 @@ export const StatsScreen: React.FC = () => {
                 <View style={[styles.chartContainer, { width: screenWidth - 40, backgroundColor: colors.surface }]}>
                   <View style={[styles.verticalChartWrapper, { width: '100%', paddingRight: 10 }]}>
                     <View style={styles.verticalChartArea}>
-                      <View style={[styles.goalLine, { bottom: `${(100 / 150) * 100}%` }]}>
+                      <View style={styles.goalLine}>
                         <Text style={styles.goalLineLabel}>100%</Text>
                       </View>
-                      <View style={[styles.verticalBarsContainer, { justifyContent: 'space-around' }]}>
+                      <View style={[styles.verticalBarsContainer, { justifyContent: 'space-around', gap: 0 }]}>
                         {workerStats.map((worker) => {
-                          const maxPct = 150;
-                          const barHeight = Math.min((worker.avgPercentage / maxPct) * 100, 100);
-                          const contentWidth = screenWidth - 100;
+                          const barHeight = Math.min((worker.avgPercentage / BAR_CHART_MAX_PCT) * 100, 100);
+                          // Ancho real: screenWidth - 40, menos padding de chartContainer (32) y del wrapper (40 + 10)
+                          const contentWidth = screenWidth - 122;
                           const exportWrapperWidth = Math.min(50, contentWidth / Math.max(1, workerStats.length));
                           const exportBarWidth = Math.max(8, exportWrapperWidth * 0.45);
                           
                           return (
                             <View key={worker.id} style={[styles.verticalBarWrapper, { width: exportWrapperWidth }]}>
-                              <Text style={[styles.verticalBarValue, { color: getPercentageColor(worker.avgPercentage), fontSize: workerStats.length > 8 ? 8 : 10 }]}>
-                                {worker.avgPercentage}%
-                              </Text>
+                              <View style={styles.verticalBarValueBox}>
+                                <Text style={[styles.verticalBarValue, { color: getPercentageColor(worker.avgPercentage), fontSize: workerStats.length > 8 ? 8 : 10 }]}>
+                                  {worker.avgPercentage}%
+                                </Text>
+                              </View>
                               <View style={[styles.verticalBarTrack, { width: exportBarWidth }]}>
                                 <View 
                                   style={[
@@ -1181,11 +1190,11 @@ const styles = StyleSheet.create({
     paddingLeft: 40,
   },
   verticalChartArea: {
-    height: 180,
     position: 'relative',
   },
   goalLine: {
     position: 'absolute',
+    top: BAR_GOAL_LINE_TOP,
     left: 0,
     right: 0,
     height: 2,
@@ -1203,15 +1212,14 @@ const styles = StyleSheet.create({
   },
   verticalBarsContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: '100%',
-    paddingTop: 20,
     gap: 8,
   },
   verticalBarWrapper: {
     width: 50,
     alignItems: 'center',
-    height: '100%',
+  },
+  verticalBarValueBox: {
+    height: BAR_VALUE_HEIGHT,
     justifyContent: 'flex-end',
   },
   verticalBarValue: {
@@ -1221,7 +1229,7 @@ const styles = StyleSheet.create({
   },
   verticalBarTrack: {
     width: 24,
-    height: '70%',
+    height: BAR_TRACK_HEIGHT,
     backgroundColor: colors.border,
     borderRadius: 12,
     justifyContent: 'flex-end',
@@ -1326,9 +1334,10 @@ const styles = StyleSheet.create({
     gap: 16,
   },
 
+  // La rotación no cambia el layout: el texto (ancho 85) se centra en esta caja para que, ya girado, quede dentro de ella
   verticalBarLabelContainer: {
     height: 90,
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     alignItems: 'center',
     marginTop: 4,
   },
