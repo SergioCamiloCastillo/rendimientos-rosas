@@ -3,8 +3,6 @@ import {
   Animated,
   Easing,
   Modal,
-  Platform,
-  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -35,9 +33,6 @@ const GAP = 14;
 const CARET = 14;
 const DIM = 'rgba(34, 30, 30, 0.72)';
 const EASE_OUT = Easing.bezier(0.215, 0.61, 0.355, 1);
-// En Android measureInWindow mide desde debajo de la barra de estado, pero el Modal
-// (statusBarTranslucent) dibuja desde el borde superior de la pantalla
-const WINDOW_OFFSET_Y = Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
 
 export const TourOverlay: React.FC<TourOverlayProps> = ({
   steps,
@@ -73,8 +68,10 @@ export const TourOverlay: React.FC<TourOverlayProps> = ({
       show(null);
       return;
     }
+    // Con edge-to-edge, measureInWindow mide desde el borde superior de la pantalla, igual
+    // que el Modal (statusBarTranslucent): no hay que sumar la barra de estado
     node.measureInWindow((x, y, width, height) => {
-      show(width > 0 && height > 0 ? { x, y: y + WINDOW_OFFSET_Y, width, height } : null);
+      show(width > 0 && height > 0 ? { x, y, width, height } : null);
     });
   }, [index]);
 
