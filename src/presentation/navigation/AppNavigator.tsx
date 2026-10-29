@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from '../theme';
+import { useTourTarget } from '../tour';
 import {
   DashboardScreen,
   WorkersScreen,
@@ -21,15 +22,22 @@ const Tab = createBottomTabNavigator();
 
 type IconName = keyof typeof MaterialIcons.glyphMap;
 
-const TabIcon = ({ icon, focused }: { icon: IconName; focused: boolean }) => (
-  <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
-    <MaterialIcons 
-      name={icon} 
-      size={24} 
-      color={focused ? colors.primary : colors.textSecondary} 
-    />
-  </View>
-);
+const TabIcon = ({ icon, focused }: { icon: IconName; focused: boolean }) => {
+  const tourTarget = useTourTarget(`tab-${icon}`);
+  return (
+    <View
+      ref={tourTarget}
+      collapsable={false}
+      style={[styles.iconContainer, focused && styles.iconContainerActive]}
+    >
+      <MaterialIcons 
+        name={icon} 
+        size={24} 
+        color={focused ? colors.primary : colors.textSecondary} 
+      />
+    </View>
+  );
+};
 
 export const AppNavigator: React.FC = () => {
   return (

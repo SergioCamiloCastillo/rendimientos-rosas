@@ -21,6 +21,7 @@ import { ActivityRepository } from '../../data/repositories';
 import { format, addDays, subDays, startOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '../context/ToastContext';
+import { useTour, useTourTarget } from '../tour';
 
 const { width } = Dimensions.get('window');
 const HEADER_BASE_HEIGHT = 290;
@@ -538,11 +539,24 @@ export const DashboardScreen: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const navigation = useNavigation();
 
+  // Elementos que resalta el tutorial; antes de empezar se sube el scroll para que estén visibles
+  const scrollRef = useRef<ScrollView>(null);
+  const { setBeforeStart } = useTour();
+  const menuTarget = useTourTarget('menu');
+  const dateTarget = useTourTarget('date');
+  const statsTarget = useTourTarget('stats');
+  const addTarget = useTourTarget('add-record');
+
+  useEffect(() => {
+    setBeforeStart(() => scrollRef.current?.scrollTo({ y: 0, animated: false }));
+    return () => setBeforeStart(null);
+  }, [setBeforeStart]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Mini Header Fijo */}
       <View style={styles.fixedMiniHeader}>
-        <TouchableOpacity onPress={() => setShowMenu(true)} style={styles.menuButton}>
+        <TouchableOpacity ref={menuTarget} onPress={() => setShowMenu(true)} style={styles.menuButton}>
           <MaterialIcons name="menu" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.miniTitle}>Rendimientos</Text>
@@ -570,6 +584,7 @@ export const DashboardScreen: React.FC = () => {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing === true} 
@@ -580,7 +595,7 @@ export const DashboardScreen: React.FC = () => {
         {/* Header Expandido */}
         <View style={styles.expandedHeader}>
           <View style={styles.headerTop}>
-            <View style={styles.dateSelector}>
+            <View ref={dateTarget} collapsable={false} style={styles.dateSelector}>
               <TouchableOpacity 
                 onPress={goToPreviousDay} 
                 style={styles.dateArrow}
@@ -609,7 +624,7 @@ export const DashboardScreen: React.FC = () => {
             </View>
           </View>
 
-          <View style={styles.statsRow}>
+          <View ref={statsTarget} collapsable={false} style={styles.statsRow}>
             <View style={[styles.statCard, { backgroundColor: colors.primaryLight }]}>
               <Text style={[styles.statCardValue, { color: colors.primary }]}>{stats.total}</Text>
               <Text style={styles.statCardLabel}>Total Registros</Text>
@@ -722,6 +737,7 @@ export const DashboardScreen: React.FC = () => {
       </ScrollView>
 
       <TouchableOpacity
+        ref={addTarget}
         style={styles.fab}
         onPress={() => setShowAddRecord(true)}
       >

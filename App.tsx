@@ -8,6 +8,7 @@ import { MD3LightTheme, PaperProvider } from 'react-native-paper';
 import { AppNavigator } from './src/presentation/navigation/AppNavigator';
 import { ToastProvider } from './src/presentation/context/ToastContext';
 import { colors } from './src/presentation/theme';
+import { TourProvider } from './src/presentation/tour';
 
 const paperTheme = {
   ...MD3LightTheme,
@@ -55,8 +56,10 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
           <ToastProvider>
-            <StatusBar style="dark" />
-            <AppNavigator />
+            <TourProvider>
+              <StatusBar style="dark" />
+              <AppNavigator />
+            </TourProvider>
           </ToastProvider>
         </SafeAreaProvider>
       </QueryClientProvider>

@@ -4,6 +4,7 @@ import { Drawer as PaperDrawer, Portal, Modal, Appbar, Divider, List } from 'rea
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts } from '../theme';
+import { useTour } from '../tour';
 
 interface SidebarProps {
   visible: boolean;
@@ -13,6 +14,16 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose }) => {
   const [expanded, setExpanded] = useState(true);
   const navigation = useNavigation();
+  const { startTour } = useTour();
+
+  const showTour = () => {
+    onClose();
+    setTimeout(() => {
+      navigation.navigate('Dashboard' as never);
+      // Esperar a que Inicio esté en pantalla antes de medir sus elementos
+      setTimeout(startTour, 400);
+    }, 100);
+  };
 
   const navigateTo = (screen: string) => {
     onClose();
@@ -100,6 +111,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose }) => {
                 label="Respaldo"
                 icon={() => <MaterialIcons name="backup" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Backup')}
+              />
+              <PaperDrawer.Item
+                label="Ver tutorial"
+                icon={() => <MaterialIcons name="help-outline" size={24} color={colors.primary} />}
+                onPress={showTour}
               />
             </List.Accordion>
           </ScrollView>
