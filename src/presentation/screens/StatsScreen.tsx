@@ -15,7 +15,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Line, Circle } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import ViewShot from 'react-native-view-shot';
+import ViewShot, { ViewShotRef } from 'react-native-view-shot';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { colors, fonts } from '../theme';
@@ -61,11 +61,11 @@ export const StatsScreen: React.FC = () => {
   const [exportingPdf, setExportingPdf] = useState<string | null>(null);
 
   // Refs para capturar las gráficas
-  const barChartRef = React.useRef<ViewShot | null>(null);
-  const trendChartRef = React.useRef<ViewShot | null>(null);
-  const workerChartRef = React.useRef<ViewShot | null>(null);
+  const barChartRef = React.useRef<ViewShotRef | null>(null);
+  const trendChartRef = React.useRef<ViewShotRef | null>(null);
+  const workerChartRef = React.useRef<ViewShotRef | null>(null);
 
-  const captureChartAsBase64 = async (ref: React.RefObject<ViewShot | null>): Promise<string | null> => {
+  const captureChartAsBase64 = async (ref: React.RefObject<ViewShotRef | null>): Promise<string | null> => {
     try {
       if (!ref.current || !ref.current.capture) return null;
       const base64 = await ref.current.capture();
@@ -76,7 +76,7 @@ export const StatsScreen: React.FC = () => {
     }
   };
 
-  const generatePdfForChart = async (chartName: string, ref: React.RefObject<ViewShot | null>) => {
+  const generatePdfForChart = async (chartName: string, ref: React.RefObject<ViewShotRef | null>) => {
     setExportingPdf(chartName);
     try {
       const base64 = await captureChartAsBase64(ref);

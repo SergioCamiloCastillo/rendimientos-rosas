@@ -35,7 +35,7 @@ export const ActivitiesScreen: React.FC = () => {
   const [performanceLockedThisWeek, setPerformanceLockedThisWeek] = useState(false);
   const [forceUnlocked, setForceUnlocked] = useState(false);
   const unlockTapCount = useRef(0);
-  const unlockTapTimer = useRef<NodeJS.Timeout | null>(null);
+  const unlockTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { showToast } = useToast();
 
   const handleUnlockTap = useCallback(() => {
