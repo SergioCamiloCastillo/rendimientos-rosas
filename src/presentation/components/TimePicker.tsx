@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Modal, Keyboard, Platform } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import { colors } from '../theme';
 
 interface TimePickerProps {
@@ -22,7 +23,7 @@ export const TimePicker: React.FC<TimePickerProps> = ({
   const [minutes, setMinutes] = useState('');
   const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const hoursInputRef = useRef<TextInput>(null);
+  const hoursInputRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     if (showModal) {

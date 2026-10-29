@@ -10,6 +10,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -540,7 +541,7 @@ export const DashboardScreen: React.FC = () => {
   const navigation = useNavigation();
 
   // Elementos que resalta el tutorial; antes de empezar se sube el scroll para que estén visibles
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const { setBeforeStart } = useTour();
   const menuTarget = useTourTarget('menu');
   const dateTarget = useTourTarget('date');

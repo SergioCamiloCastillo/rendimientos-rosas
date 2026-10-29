@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import type { HostInstance } from 'react-native';
 import { colors, fonts } from '../theme';
 import { TourStep } from './steps';
 
@@ -23,7 +24,7 @@ interface Rect {
 interface TourOverlayProps {
   steps: TourStep[];
   index: number;
-  getTarget: (id: string) => View | undefined;
+  getTarget: (id: string) => HostInstance | undefined;
   onNext: () => void;
   onPrev: () => void;
   onSkip: () => void;

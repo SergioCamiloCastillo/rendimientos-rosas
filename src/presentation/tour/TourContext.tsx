@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import type { HostInstance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TOUR_STEPS } from './steps';
 import { TourOverlay } from './TourOverlay';
@@ -10,7 +10,7 @@ const FIRST_RUN_DELAY = 2600;
 
 interface TourContextValue {
   startTour: () => void;
-  registerTarget: (id: string, node: View | null) => void;
+  registerTarget: (id: string, node: HostInstance | null) => void;
   // Lo que debe pasar antes de medir (p. ej. subir el scroll de Inicio)
   setBeforeStart: (fn: (() => void) | null) => void;
 }
@@ -18,11 +18,11 @@ interface TourContextValue {
 const TourContext = createContext<TourContextValue | null>(null);
 
 export const TourProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const targets = useRef(new Map<string, View>());
+  const targets = useRef(new Map<string, HostInstance>());
   const beforeStart = useRef<(() => void) | null>(null);
   const [index, setIndex] = useState<number | null>(null);
 
-  const registerTarget = useCallback((id: string, node: View | null) => {
+  const registerTarget = useCallback((id: string, node: HostInstance | null) => {
     if (node) targets.current.set(id, node);
     else targets.current.delete(id);
   }, []);
@@ -84,5 +84,5 @@ export const useTour = () => {
 /** Ref para marcar un elemento que el tutorial puede resaltar. */
 export const useTourTarget = (id: string) => {
   const { registerTarget } = useTour();
-  return useCallback((node: View | null) => registerTarget(id, node), [id, registerTarget]);
+  return useCallback((node: HostInstance | null) => registerTarget(id, node), [id, registerTarget]);
 };
