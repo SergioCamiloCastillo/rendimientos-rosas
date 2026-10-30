@@ -8,6 +8,7 @@ import { AppNavigator } from './src/presentation/navigation/AppNavigator';
 import { ToastProvider } from './src/presentation/context/ToastContext';
 import { colors } from './src/presentation/theme';
 import { TourProvider } from './src/presentation/tour';
+import { recordFirstOpen } from './src/utils/firstOpen';
 
 const paperTheme = {
   ...MD3LightTheme,
@@ -34,6 +35,10 @@ LogBox.ignoreLogs([
 SplashScreen.preventAutoHideAsync();
 
 export default function App() {
+  useEffect(() => {
+    recordFirstOpen().catch(() => {});
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(async () => {
       await SplashScreen.hideAsync();

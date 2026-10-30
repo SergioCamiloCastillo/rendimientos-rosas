@@ -4,6 +4,7 @@ import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { format } from 'date-fns';
 import { STORAGE_KEYS } from '../infrastructure/storage/AsyncStorageAdapter';
+import { getFirstOpenDate, keepEarliestFirstOpen } from './firstOpen';
 
 // Formato del archivo de respaldo. Si cambia la estructura, subir BACKUP_VERSION
 // y mantener la lectura de versiones anteriores en parseBackup.
@@ -28,6 +29,9 @@ export interface BackupFile {
   app: typeof BACKUP_APP;
   version: number;
   createdAt: string;
+  // Primera apertura de la app en el celular donde se hizo el respaldo (opcional: los
+  // respaldos anteriores no la traen)
+  firstOpenAt?: string;
   data: BackupData;
 }
 
@@ -68,10 +72,12 @@ export const getLastBackupDate = async (): Promise<Date | null> => {
  */
 export const createBackup = async (): Promise<BackupCounts> => {
   const now = new Date();
+  const firstOpen = await getFirstOpenDate();
   const backup: BackupFile = {
     app: BACKUP_APP,
     version: BACKUP_VERSION,
     createdAt: now.toISOString(),
+    firstOpenAt: firstOpen?.toISOString(),
     data: await readCurrentData(),
   };
 
@@ -125,7 +131,13 @@ export const parseBackup = (text: string): BackupFile => {
     data[section] = list;
   }
 
-  return { app: BACKUP_APP, version: json.version, createdAt: String(json.createdAt ?? ''), data };
+  return {
+    app: BACKUP_APP,
+    version: json.version,
+    createdAt: String(json.createdAt ?? ''),
+    firstOpenAt: typeof json.firstOpenAt === 'string' ? json.firstOpenAt : undefined,
+    data,
+  };
 };
 
 /** Abre el selector de archivos y devuelve el respaldo leído, o null si se canceló. */
@@ -150,4 +162,5 @@ export const restoreBackup = async (backup: BackupFile): Promise<void> => {
   await AsyncStorage.multiSet(
     SECTIONS.map(s => [BACKUP_SECTIONS[s], JSON.stringify(backup.data[s])])
   );
+  await keepEarliestFirstOpen(backup.firstOpenAt);
 };
