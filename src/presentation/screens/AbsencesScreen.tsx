@@ -231,7 +231,7 @@ export const AbsencesScreen: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity onPress={goToToday} style={styles.dateTouchable}>
           <Text style={styles.dateText}>
-            {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
+            {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^./, c => c.toUpperCase())}
           </Text>
           {!isToday && <Text style={styles.todayHint}>Toca para ir a hoy</Text>}
         </TouchableOpacity>
@@ -423,7 +423,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
-    textTransform: 'capitalize',
   },
   todayHint: {
     fontSize: 11,

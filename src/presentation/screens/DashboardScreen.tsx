@@ -610,7 +610,7 @@ export const DashboardScreen: React.FC = () => {
                 activeOpacity={0.7}
               >
                 <Text style={styles.dateText}>
-                  {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es })}
+                  {format(selectedDate, "EEEE, d 'de' MMMM", { locale: es }).replace(/^./, c => c.toUpperCase())}
                 </Text>
                 {!isToday && <Text style={styles.todayHint}>Toca para ir a hoy</Text>}
               </TouchableOpacity>
@@ -750,7 +750,7 @@ export const DashboardScreen: React.FC = () => {
       <BottomSheet visible={showAddRecord} onClose={() => { resetForm(); setShowAddRecord(false); }}>
         <Text style={styles.sheetTitle}>Nuevo Registro</Text>
         <Text style={styles.sheetDate}>
-          {format(selectedDate, "EEEE, d 'de' MMMM yyyy", { locale: es })}
+          {format(selectedDate, "EEEE, d 'de' MMMM yyyy", { locale: es }).replace(/^./, c => c.toUpperCase())}
         </Text>
         
         <Select
@@ -1193,7 +1193,6 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 16,
     color: colors.text,
-    textTransform: 'capitalize',
     textAlign: 'center',
     fontFamily: fonts.displayMedium,
     letterSpacing: -0.3,
@@ -1449,7 +1448,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 20,
     textAlign: 'center',
-    textTransform: 'capitalize',
   },
   metaInfo: {
     backgroundColor: colors.primaryLight,
