@@ -9,7 +9,7 @@ Todo lo que pide Google Play Console, en el orden en que lo vas a necesitar.
 - Ícono para la tienda: `play-store/icono-512.png` (512×512).
 - Gráfico de funciones: `play-store/grafico-funciones-1024x500.png` (1024×500).
 - Permisos mínimos: sin micrófono, cámara ni almacenamiento (`android.blockedPermissions`).
-- Android 16 / API 36 como `targetSdk` (lo trae Expo SDK 54), que cumple el requisito de Play.
+- Android 16 / API 36 como `targetSdk` (lo trae Expo SDK 58), que es lo que Play exige a las apps nuevas desde agosto de 2026.
 - `eas.json` con dos perfiles:
   - `preview`: APK para instalar a mano y probar.
   - `production`: AAB (`app-bundle`) para subir a Play, con número de versión automático.
@@ -20,9 +20,13 @@ Todo lo que pide Google Play Console, en el orden en que lo vas a necesitar.
 - [ ] Poner tu correo de contacto en `docs/privacidad.html` (busca `[TU CORREO DE CONTACTO]`).
 - [ ] Publicar la política en una URL pública. Lo más fácil es GitHub Pages: en el repo, *Settings → Pages → Deploy from a branch → main / docs*. Quedaría en
       `https://sergiocamilocastillo.github.io/rendimientos-rosas/privacidad.html`.
-      Antes de hacer push, desactiva la key de Gemini que está en el historial (commit `bc15483`).
-- [ ] Crear la cuenta de desarrollador en Google Play Console (US$25, un solo pago, con verificación de identidad).
-- [ ] Tomar de 2 a 8 capturas de pantalla desde el celular (ver sección 5).
+- [ ] Crear la cuenta de desarrollador en Google Play Console. Hazlo primero: la verificación tarda unos días.
+  1. Entra a [play.google.com/console/signup](https://play.google.com/console/signup) con la cuenta de Google que quieras dejar como dueña de la app.
+  2. Elige cuenta **personal** ("Para ti"). La de organización exige número D-U-N-S de una empresa registrada.
+  3. Paga los US$25 (un solo pago, con tarjeta).
+  4. Verifica tu identidad con la cédula, tu correo y tu teléfono.
+  5. Instala la app *Google Play Console* en un celular Android e inicia sesión con esa cuenta: Google pide verificar que tienes un dispositivo Android.
+- [ ] Crear una cuenta gratis en [expo.dev](https://expo.dev) para generar el build (sección 8).
 - [ ] Conseguir 12 testers para la prueba cerrada (ver sección 7).
 
 ## 3. Ficha de la tienda
@@ -75,17 +79,20 @@ Pensada para fincas de flores y cultivos donde el trabajo se controla por rendim
 |---|---|---|
 | Ícono de la app | `play-store/icono-512.png` | 512×512 PNG |
 | Gráfico de funciones | `play-store/grafico-funciones-1024x500.png` | 1024×500 PNG |
-| Capturas de teléfono | las tomas tú | mínimo 2, formato vertical |
+| Capturas de teléfono | `play-store/capturas/01…06-*.png` | 1080×1920 PNG (9:16) |
 
 ## 5. Capturas de pantalla
 
-Tómalas desde el celular con datos de ejemplo (no uses nombres reales de trabajadores de Innovaflora). Las que más venden:
+Ya están en `play-store/capturas/`, en el orden en que van en la ficha:
 
-1. El dashboard del día con varios registros.
-2. Estadísticas: rendimiento por trabajador.
-3. La pantalla de Exportar con los tipos de reporte.
-4. Metas semanales con el avance.
-5. Un Excel ya abierto, para que se vea el resultado.
+1. Inicio: el rendimiento del día.
+2. Nuevo registro.
+3. Estadísticas: quién cumple la meta.
+4. Metas semanales por bloque.
+5. Reportes en Excel.
+6. Respaldo: los datos se quedan en el celular.
+
+Se tomaron en el emulador con datos inventados (nombres ficticios, ninguno de Innovaflora), con la barra de estado limpia, y llevan un titular arriba con el estilo de la marca. Súbelas todas en *Ficha de Play Store principal → Capturas de pantalla del teléfono*.
 
 ## 6. Formularios de Play Console
 
@@ -153,4 +160,11 @@ La primera vez, EAS pregunta si genera un keystore nuevo: di que **sí**. EAS lo
 
 Los APK que instalaste antes en Innovaflora están firmados con la clave de depuración. Android no deja actualizar una app firmada con una clave distinta, así que para pasarlos a la versión de Play **hay que desinstalar la app vieja, y eso borra todos sus datos**.
 
-Mientras la app no tenga una función de respaldo (exportar e importar los datos), deja esos celulares con el APK actual o planea el cambio en un corte de semana, después de exportar los reportes.
+Para no perderlos, en cada celular:
+
+1. Abre la app vieja y ve a *Menú → Respaldo → Crear respaldo*. Guarda el archivo en Drive o mándatelo por WhatsApp.
+2. Desinstala la app vieja.
+3. Instala Rinde desde Play.
+4. En *Menú → Respaldo → Restaurar respaldo → Elegir archivo*, elige el archivo del paso 1.
+
+Hazlo en un corte de semana, después de sacar los reportes.
