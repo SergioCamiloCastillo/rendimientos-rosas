@@ -1,3 +1,5 @@
+import { PREMIUM_ENABLED } from '../../config/features';
+
 export interface TourStep {
   id: string;
   // Elemento que se resalta (registrado con useTourTarget). Sin target, el globo sale centrado.
@@ -33,7 +35,9 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'menu',
     target: 'menu',
     title: '3. Crea los bloques',
-    text: 'En el menú están Bloques, Metas semanales, Ausencias, Estadísticas y Respaldo. Necesitas al menos un bloque para registrar turnos.',
+    text: PREMIUM_ENABLED
+      ? 'En el menú están Bloques, Metas semanales, Ausencias, Estadísticas y Respaldo. Necesitas al menos un bloque para registrar turnos.'
+      : 'En el menú están Bloques, Ausencias y Respaldo. Necesitas al menos un bloque para registrar turnos.',
   },
   {
     id: 'add',
@@ -65,7 +69,9 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'tab-file-download',
     extendBottom: 20,
     title: 'Reportes en Excel',
-    text: 'Saca el reporte semanal, el plan de trabajo (meta contra lo realizado) o el detalle por trabajador o tarea, y compártelo por WhatsApp o correo.',
+    text: PREMIUM_ENABLED
+      ? 'Saca el reporte semanal, el plan de trabajo (meta contra lo realizado) o el detalle por trabajador o tarea, y compártelo por WhatsApp o correo.'
+      : 'Saca el reporte semanal con el resumen y el detalle por trabajador, y compártelo por WhatsApp o correo.',
   },
   {
     id: 'done',

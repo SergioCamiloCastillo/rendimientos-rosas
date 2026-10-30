@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, fonts } from '../theme';
+import { PREMIUM_ENABLED } from '../../config/features';
 import { Button, Input, BottomSheet, ListItem, EmptyState, Sidebar, MenuButton } from '../components';
 import { useBlockStore } from '../../store';
 import { Block } from '../../domain/entities';
@@ -282,7 +283,7 @@ export const BlocksScreen: React.FC = () => {
 
         <View style={styles.helpText}>
           <Text style={styles.helpTextContent}>
-            💡 Los bloques se usan para organizar las metas semanales y registros de rendimiento
+            💡 Los bloques se usan para organizar {PREMIUM_ENABLED ? 'las metas semanales y ' : ''}los registros de rendimiento
           </Text>
         </View>
 

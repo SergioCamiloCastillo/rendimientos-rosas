@@ -53,11 +53,11 @@ QUÉ PUEDES HACER
 • Actividades: cada labor con su unidad de medida y su meta por hora (tallos, camas, plantas…).
 • Bloques: organiza el trabajo por bloque o lote.
 • Registros diarios: uno o varios turnos por trabajador, y la app avisa si los horarios se cruzan.
-• Metas semanales: fija metas por actividad y bloque, y mira cuánto llevas y cuánto falta.
+• Resumen del día: cuántos cumplieron la meta, el porcentaje de cumplimiento y el total por labor.
+• Historial: consulta y corrige los registros de días anteriores.
 • Ausencias: personas y horas perdidas de cada día, con observaciones.
-• Estadísticas: rendimiento promedio, rendimiento por trabajador y su tendencia en el tiempo.
-• Reportes en Excel: semanal (resumen y detalle por trabajador), plan de trabajo (meta contra lo realizado por bloque y actividad), por actividad y por trabajador. Eliges las columnas y lo compartes por WhatsApp o correo.
-• Gráficas en PDF para compartir con la administración.
+• Reporte semanal en Excel: resumen y detalle por trabajador, listo para compartir por WhatsApp o correo.
+• Respaldo: guarda todos tus datos en un archivo y pásalos a otro celular cuando lo necesites.
 
 FUNCIONA SIN INTERNET
 Todo se guarda en tu celular. No necesitas señal en el campo ni crear una cuenta.
@@ -87,10 +87,12 @@ Ya están en `play-store/capturas/`, en el orden en que van en la ficha:
 
 1. Inicio: el rendimiento del día.
 2. Nuevo registro.
-3. Estadísticas: quién cumple la meta.
-4. Metas semanales por bloque.
-5. Reportes en Excel.
+3. Historial: consulta y corrige días anteriores.
+4. Ausencias: quién faltó y cuántas horas se perdieron.
+5. Reporte semanal en Excel.
 6. Respaldo: los datos se quedan en el celular.
+
+Estadísticas, Metas semanales y los reportes avanzados están ocultos en esta versión (`PREMIUM_ENABLED = false` en `src/config/features.ts`), así que no salen en las capturas ni en la descripción. Si se activan, hay que volver a incluirlos aquí.
 
 Se tomaron en el emulador con datos inventados (nombres ficticios, ninguno de Innovaflora), con la barra de estado limpia, y llevan un titular arriba con el estilo de la marca. Súbelas todas en *Ficha de Play Store principal → Capturas de pantalla del teléfono*.
 

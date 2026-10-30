@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { colors, fonts } from '../theme';
+import { PREMIUM_ENABLED } from '../../config/features';
 import { Button, Card, Sidebar, MenuButton } from '../components';
 import { useToast } from '../context/ToastContext';
 import {
@@ -26,7 +27,7 @@ import {
   useAbsenceStore,
 } from '../../store';
 
-const COUNT_LABELS: { key: keyof BackupCounts; one: string; many: string }[] = [
+const ALL_COUNT_LABELS: { key: keyof BackupCounts; one: string; many: string }[] = [
   { key: 'workers', one: 'trabajador', many: 'trabajadores' },
   { key: 'activities', one: 'actividad', many: 'actividades' },
   { key: 'blocks', one: 'bloque', many: 'bloques' },
@@ -34,6 +35,9 @@ const COUNT_LABELS: { key: keyof BackupCounts; one: string; many: string }[] = [
   { key: 'weeklyGoals', one: 'meta semanal', many: 'metas semanales' },
   { key: 'absences', one: 'día con ausencias', many: 'días con ausencias' },
 ];
+
+// Sin Premium la pantalla de metas está oculta: no se muestran en los conteos
+const COUNT_LABELS = ALL_COUNT_LABELS.filter(({ key }) => PREMIUM_ENABLED || key !== 'weeklyGoals');
 
 const summarize = (counts: BackupCounts) =>
   COUNT_LABELS.map(({ key, one, many }) => `${counts[key]} ${counts[key] === 1 ? one : many}`).join('\n');

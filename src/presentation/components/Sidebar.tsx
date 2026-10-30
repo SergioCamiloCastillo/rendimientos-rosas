@@ -5,6 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts } from '../theme';
 import { useTour } from '../tour';
+import { PREMIUM_ENABLED } from '../../config/features';
 
 interface SidebarProps {
   visible: boolean;
@@ -86,22 +87,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ visible, onClose }) => {
                 icon={() => <MaterialIcons name="history" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Records')}
               />
-              
-              <PaperDrawer.Item
-                label="Estadísticas"
-                icon={() => <MaterialIcons name="bar-chart" size={24} color={colors.primary} />}
-                onPress={() => navigateTo('Stats')}
-              />
+              {PREMIUM_ENABLED && (
+                <PaperDrawer.Item
+                  label="Estadísticas"
+                  icon={() => <MaterialIcons name="bar-chart" size={24} color={colors.primary} />}
+                  onPress={() => navigateTo('Stats')}
+                />
+              )}
               <PaperDrawer.Item
                 label="Exportar"
                 icon={() => <MaterialIcons name="file-download" size={24} color={colors.primary} />}
                 onPress={() => navigateTo('Export')}
               />
-              <PaperDrawer.Item
-                label="Metas Semanales"
-                icon={() => <MaterialIcons name="flag" size={24} color={colors.primary} />}
-                onPress={() => navigateTo('WeeklyGoals')}
-              />
+              {PREMIUM_ENABLED && (
+                <PaperDrawer.Item
+                  label="Metas Semanales"
+                  icon={() => <MaterialIcons name="flag" size={24} color={colors.primary} />}
+                  onPress={() => navigateTo('WeeklyGoals')}
+                />
+              )}
               <PaperDrawer.Item
                 label="Ausencias"
                 icon={() => <MaterialIcons name="event-busy" size={24} color={colors.primary} />}

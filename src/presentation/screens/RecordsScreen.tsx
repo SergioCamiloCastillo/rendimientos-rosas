@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { colors, fonts } from '../theme';
+import { PREMIUM_ENABLED } from '../../config/features';
 import { PerformanceCard, BottomSheet, Select, Button, EmptyState, Sidebar, MenuButton, Input } from '../components';
 import { useWorkerStore, useActivityStore, usePerformanceStore, useBlockStore } from '../../store';
 import { exportToExcel, exportByActivity, exportByWorker } from '../../utils/excelExport';
@@ -141,12 +142,14 @@ export const RecordsScreen: React.FC = () => {
         <MenuButton onPress={() => setShowMenu(true)} />
         <Text style={styles.title}>Historial</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => navigation.navigate('Stats')}
-          >
-            <MaterialIcons name="bar-chart" size={24} color={colors.textSecondary} />
-          </TouchableOpacity>
+          {PREMIUM_ENABLED && (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('Stats')}
+            >
+              <MaterialIcons name="bar-chart" size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={[styles.headerButton, hasActiveFilters && styles.headerButtonActive]}
             onPress={() => setShowFilters(true)}

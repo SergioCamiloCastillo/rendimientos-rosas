@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors, fonts } from '../theme';
+import { PREMIUM_ENABLED } from '../../config/features';
 import { usePerformanceStore, useWorkerStore, useActivityStore, useBlockStore } from '../../store';
 import { exportToExcel, exportByActivity, exportByWorker, exportWeeklyReport, exportWorkPlan, WEEKLY_SUMMARY_FIELDS, WEEKLY_DETAIL_FIELDS } from '../../utils/excelExport';
 import { useToast } from '../context/ToastContext';
@@ -199,51 +200,53 @@ export const ExportScreen: React.FC = () => {
         </View>
 
         {/* Filtros opcionales */}
-        <View style={styles.filterSection}>
-          <View style={styles.filterHeader}>
-            <Text style={styles.sectionTitle}>Filtros opcionales</Text>
-            {(selectedWorker || selectedActivity || selectedBlock) && (
-              <TouchableOpacity 
-                style={styles.clearFiltersBtn}
-                onPress={() => {
-                  setSelectedWorker('');
-                  setSelectedActivity('');
-                  setSelectedBlock('');
-                }}
-              >
-                <MaterialIcons name="clear" size={16} color={colors.danger} />
-                <Text style={styles.clearFiltersText}>Limpiar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          
-          <Select
-            label="Trabajador (opcional)"
-            placeholder="Todos los trabajadores"
-            options={[{ label: 'Todos los trabajadores', value: '' }, ...workerOptions]}
-            value={selectedWorker}
-            onChange={setSelectedWorker}
-          />
-          
-          <Select
-            label="Actividad (opcional)"
-            placeholder="Todas las actividades"
-            options={[{ label: 'Todas las actividades', value: '' }, ...activityOptions]}
-            value={selectedActivity}
-            onChange={setSelectedActivity}
-          />
+        {PREMIUM_ENABLED && (
+          <View style={styles.filterSection}>
+            <View style={styles.filterHeader}>
+              <Text style={styles.sectionTitle}>Filtros opcionales</Text>
+              {(selectedWorker || selectedActivity || selectedBlock) && (
+                <TouchableOpacity 
+                  style={styles.clearFiltersBtn}
+                  onPress={() => {
+                    setSelectedWorker('');
+                    setSelectedActivity('');
+                    setSelectedBlock('');
+                  }}
+                >
+                  <MaterialIcons name="clear" size={16} color={colors.danger} />
+                  <Text style={styles.clearFiltersText}>Limpiar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            <Select
+              label="Trabajador (opcional)"
+              placeholder="Todos los trabajadores"
+              options={[{ label: 'Todos los trabajadores', value: '' }, ...workerOptions]}
+              value={selectedWorker}
+              onChange={setSelectedWorker}
+            />
+            
+            <Select
+              label="Actividad (opcional)"
+              placeholder="Todas las actividades"
+              options={[{ label: 'Todas las actividades', value: '' }, ...activityOptions]}
+              value={selectedActivity}
+              onChange={setSelectedActivity}
+            />
 
-          <Select
-            label="Bloque (opcional)"
-            placeholder="Todos los bloques"
-            options={[
-              { label: 'Todos los bloques', value: '' },
-              ...blockList.map(b => ({ label: `Bloque ${b.name}`, value: b.name })),
-            ]}
-            value={selectedBlock}
-            onChange={setSelectedBlock}
-          />
-        </View>
+            <Select
+              label="Bloque (opcional)"
+              placeholder="Todos los bloques"
+              options={[
+                { label: 'Todos los bloques', value: '' },
+                ...blockList.map(b => ({ label: `Bloque ${b.name}`, value: b.name })),
+              ]}
+              value={selectedBlock}
+              onChange={setSelectedBlock}
+            />
+          </View>
+        )}
 
         {/* Opciones de exportación */}
         <View style={styles.options}>
@@ -253,7 +256,7 @@ export const ExportScreen: React.FC = () => {
           {!selectedWorker && !selectedActivity && differenceInDays(endDate, startDate) <= 7 && (
             <TouchableOpacity 
               style={styles.exportOption}
-              onPress={() => setShowFieldSelector(true)}
+              onPress={() => (PREMIUM_ENABLED ? setShowFieldSelector(true) : handleExport('weekly'))}
               activeOpacity={0.7}
               disabled={exporting}
             >
@@ -264,30 +267,40 @@ export const ExportScreen: React.FC = () => {
                 <Text style={styles.optionTitle}>Reporte Semanal</Text>
                 <Text style={styles.optionSubtitle}>Resumen + detalle por trabajador</Text>
               </View>
-              <MaterialIcons name="tune" size={20} color={colors.textLight} />
+              {PREMIUM_ENABLED
+                ? <MaterialIcons name="tune" size={20} color={colors.textLight} />
+                : <Text style={styles.chevron}>›</Text>}
             </TouchableOpacity>
           )}
 
+          {!PREMIUM_ENABLED && differenceInDays(endDate, startDate) > 7 && (
+            <Text style={styles.optionSubtitle}>
+              El reporte semanal es de máximo 7 días. Elige "Esta semana" o "Semana pasada".
+            </Text>
+          )}
+
           {/* Reporte Plan de Trabajo */}
-          <TouchableOpacity 
-            style={styles.exportOption}
-            onPress={handleExportWorkPlan}
-            activeOpacity={0.7}
-            disabled={exporting}
-          >
-            <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
-              <MaterialIcons name="assignment" size={24} color={colors.primary} />
-            </View>
-            <View style={styles.optionContent}>
-              <Text style={styles.optionTitle}>Reporte Plan de Trabajo</Text>
-              <Text style={styles.optionSubtitle}>Meta vs realizado por bloque y actividad</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
+          {PREMIUM_ENABLED && (
+            <TouchableOpacity 
+              style={styles.exportOption}
+              onPress={handleExportWorkPlan}
+              activeOpacity={0.7}
+              disabled={exporting}
+            >
+              <View style={[styles.optionIcon, { backgroundColor: colors.primaryLight }]}>
+                <MaterialIcons name="assignment" size={24} color={colors.primary} />
+              </View>
+              <View style={styles.optionContent}>
+                <Text style={styles.optionTitle}>Reporte Plan de Trabajo</Text>
+                <Text style={styles.optionSubtitle}>Meta vs realizado por bloque y actividad</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </TouchableOpacity>
+          )}
 
 
           {/* Por Actividad - solo si no hay actividad específica seleccionada */}
-          {!selectedActivity && (
+          {PREMIUM_ENABLED && !selectedActivity && (
             <TouchableOpacity 
               style={styles.exportOption}
               onPress={() => handleExport('byActivity')}
@@ -310,7 +323,7 @@ export const ExportScreen: React.FC = () => {
           )}
 
           {/* Por Trabajador - solo si no hay trabajador específico seleccionado */}
-          {!selectedWorker && (
+          {PREMIUM_ENABLED && !selectedWorker && (
             <TouchableOpacity 
               style={styles.exportOption}
               onPress={() => handleExport('byWorker')}
